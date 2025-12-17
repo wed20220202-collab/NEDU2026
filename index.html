@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{margin:0;padding:0;background:#0e0e10;font-family:"Segoe UI",sans-serif;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{background:rgba(30,30,32,.85);padding:40px 35px;border-radius:16px;box-shadow:0 0 25px rgba(0,0,0,.6);width:360px;text-align:center;backdrop-filter:blur(6px);animation:fadeIn .7s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+button{width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4e7fff,#335dff);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:.25s}
+button:hover{opacity:.85;transform:scale(1.02)}
+.secondary{margin-top:10px;background:#444}
+.error{color:#ff7474;margin-top:12px;font-size:14px;display:none}
+input[type="password"]{width:100%;padding:12px;border:2px solid #4e7fff;border-radius:8px;background:#1d1d20;color:#fff;outline:none;margin-bottom:16px;font-size:15px;transition:.3s}
+input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
+.small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
+</style>
+</head>
+
+<body oncontextmenu="return false">
+<div class="card">
+  <h2>login画面</h2>
+  <input id="pw" type="password" placeholder="パスワードを入力">
+  <button onclick="loginTo('movie.html')">動画を開く</button>
+  <button class="secondary" onclick="loginTo('viewer.html')">画像ビューアを開く</button>
+  <div id="err" class="error">パスワードが違います</div>
+  <div class="small">
+    ※ログイン状態はタブを閉じると消えます<br>
+    ※一定時間で自動ログアウトします
+  </div>
+</div>
+
+<script>
+/* =========================
+   設定
+========================= */
+
+const PASSWORD_HASH = "ab8a0075db27001e5d40f032435daf393b17b2c09b491ed75c7d3d1b4d51c3b8";
+
+// 自動ログアウト時間（20分）
+const SESSION_TTL_MS = 20 * 60 * 1000;
+
+/* =========================
+   SHA-256 関数
+========================= */
+async function sha256(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/* =========================
+   ログイン処理
+========================= */
+async function loginTo(nextPage){
+  const input = document.getElementById("pw").value.trim();
+
+  // 入力をハッシュ化
+  const inputHash = await sha256(input);
+
+  if (inputHash === PASSWORD_HASH) {
+    // ログイン成功
+    sessionStorage.setItem("loginOK", "1");
+    sessionStorage.setItem(
+      "sid",
+      Date.now() + "_" + Math.random().toString(36).slice(2)
+    );
+    sessionStorage.setItem("loginAt", String(Date.now()));
+    sessionStorage.setItem("ttl", String(SESSION_TTL_MS));
+
+    // 画面遷移
+    location.replace(nextPage);
+  } else {
+    document.getElementById("err").style.display = "block";
+  }
+}
+</script>
+
+</body>
+</html>
