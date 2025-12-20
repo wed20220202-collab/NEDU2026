@@ -99,20 +99,6 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
-  authDomain: "endlees-accescounter.firebaseapp.com",
-  projectId: "endlees-accescounter",
-  storageBucket: "endlees-accescounter.firebasestorage.app",
-  messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
-  measurementId: "G-T2XD6N46Z8"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 //^-^--------------------------------------------------------------------------------
 // ✅ 公開設定チェック
 const cfgRef = doc(db, "stats", "config");
@@ -146,6 +132,19 @@ try {
 }
 
 //--------------------------------------------------------------------------------^=^
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
+  authDomain: "endlees-accescounter.firebaseapp.com",
+  projectId: "endlees-accescounter",
+  storageBucket: "endlees-accescounter.firebasestorage.app",
+  messagingSenderId: "70250476146",
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
+  measurementId: "G-T2XD6N46Z8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 // 匿名ID
 let anonId = localStorage.getItem("anon_id");

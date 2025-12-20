@@ -69,12 +69,6 @@ th{opacity:.8}
 
 <h3 id="count">総アクセス数：-</h3>
 
-<select id="publishSelect">
-  <option value="true">公開</option>
-  <option value="false">非公開</option>
-</select>
-<button id="savePublish">保存</button>
-
 <button id="csv">📤 CSV ダウンロード</button>
 
 <h3>📊 日別アクセス</h3>
@@ -96,42 +90,68 @@ th{opacity:.8}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
-  from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, limit, setDoc } 
-  from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
+/* 🔧 Firebase 設定（index.html と同じ） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
-  projectId: "endlees-accescounter"
+  projectId: "endlees-accescounter",
+  storageBucket: "endlees-accescounter.firebasestorage.app",
+  messagingSenderId: "70250476146",
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
+  measurementId: "G-T2XD6N46Z8"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+/* UI */
 const statusEl = document.getElementById("status");
-const loginBtn = document.getElementById("login");
+const loginBtn  = document.getElementById("login");
 const logoutBtn = document.getElementById("logout");
-const countEl = document.getElementById("count");
-const rowsEl = document.getElementById("rows");
-const calEl = document.getElementById("calendar");
-const csvBtn = document.getElementById("csv");
-const publishSelect = document.getElementById("publishSelect");
+const countEl   = document.getElementById("count");
+const rowsEl    = document.getElementById("rows");
+const calEl     = document.getElementById("calendar");
+const csvBtn    = document.getElementById("csv");
 
+/* ログイン */
 loginBtn.onclick = async () => {
   const email = prompt("管理者メール");
   const pass  = prompt("管理者パスワード");
-  await signInWithEmailAndPassword(auth, email, pass);
+  if(!email || !pass) return;
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){
+    alert("ログイン失敗");
+  }
 };
 
-logoutBtn.onclick = () => signOut(auth);
+/* ログアウト */
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+};
 
+/* 認証状態 */
 onAuthStateChanged(auth, async (u)=>{
   rowsEl.innerHTML="";
   calEl.innerHTML="";
-
   if(!u){
     statusEl.textContent="未ログイン";
     loginBtn.style.display="";
@@ -143,34 +163,27 @@ onAuthStateChanged(auth, async (u)=>{
   statusEl.textContent=`ログイン中：${u.email}`;
   loginBtn.style.display="none";
   logoutBtn.style.display="";
-
-  // 🔓 公開設定
-  const cfg = await getDoc(doc(db,"stats","config"));
-  publishSelect.value = cfg.exists() ? String(cfg.data().publish) : "true";
-
-  // 🔢 総アクセス
+  
+  /* 総カウンタ */
   const c = await getDoc(doc(db,"stats","access"));
-  countEl.textContent = "総アクセス数：" + (c.exists()?c.data().count:0);
+  const total = c.exists() ? (c.data().count ?? 0) : 0;
+  countEl.textContent = "総アクセス数：" + total;
 
-  // 📋 ログ
-  const q = query(collection(db,"access_logs"), orderBy("time","desc"), limit(200));
+  /* logs 読み込み */
+  const q = query(
+    collection(db,"access_logs"),
+    orderBy("time","desc"),
+    limit(200)
+  );
   const snap = await getDocs(q);
-  const logs=[];
-  snap.forEach(d=>logs.push(d.data()));
+
+  const logs = [];
+  snap.forEach(d => logs.push(d.data()));
 
   renderTable(logs);
   renderCalendar(logs);
   setupCSV(logs);
 });
-
-// 公開設定保存
-document.getElementById("savePublish").onclick = async ()=>{
-  await setDoc(doc(db,"stats","config"),{
-    publish: publishSelect.value === "true",
-    updatedAt: new Date()
-  },{merge:true});
-  alert("保存しました");
-};
 
 /* テーブル描画 */
 function renderTable(logs){
@@ -230,18 +243,6 @@ function setupCSV(logs){
     URL.revokeObjectURL(url);
   };
 }
-// 公開設定 保存
-document.getElementById("savePublish").onclick = async () => {
-  const v = document.getElementById("publishSelect").value === "true";
-
-  await setDoc(
-    doc(db, "stats", "config"),
-    { publish: v, updatedAt: new Date() },
-    { merge: true }
-  );
-
-  alert("公開設定を保存しました");
-};
 
 </script>
 </body>
