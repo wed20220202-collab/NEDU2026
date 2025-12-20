@@ -5,13 +5,9 @@
 <title>Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{font-family:system-ui,sans-serif;background:#111;color:#fff;padding:20px}
-button{padding:10px 14px;border:0;border-radius:10px;background:#335dff;color:#fff;font-weight:700;cursor:pointer}
-button:hover{opacity:.9}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border-bottom:1px solid #333;padding:6px;font-size:12px;vertical-align:top}
-#status{opacity:.8;margin:8px 0}
-.small{opacity:.7;font-size:12px}
+body{font-family:sans-serif;background:#111;color:#fff;padding:20px}
+table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid #333;padding:6px;font-size:12px}
 </style>
 </head>
 <body>
@@ -19,87 +15,45 @@ th,td{border-bottom:1px solid #333;padding:6px;font-size:12px;vertical-align:top
 <h2>管理画面</h2>
 <div id="status">未ログイン</div>
 <button id="login">管理者ログイン</button>
-<button id="logout" style="display:none;background:#444">ログアウト</button>
-
-<h3 id="count">総アクセス数: -</h3>
-<div class="small">logs は最新200件まで表示</div>
+<h3 id="count"></h3>
 
 <table>
-<thead><tr><th>time</th><th>anonId</th><th>page</th><th>ref</th><th>UA</th></tr></thead>
+<thead><tr><th>time</th><th>anon</th><th>UA</th></tr></thead>
 <tbody id="rows"></tbody>
 </table>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, getDocs, orderBy, query, limit } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
-  authDomain: "endlees-accescounter.firebaseapp.com",
-  projectId: "endlees-accescounter",
-  storageBucket: "endlees-accescounter.firebasestorage.app",
-  messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
-  measurementId: "G-T2XD6N46Z8"
-};
-
+const firebaseConfig = { /* 同じ設定 */ };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const statusEl = document.getElementById("status");
-const rowsEl = document.getElementById("rows");
-const loginBtn = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
-const countEl = document.getElementById("count");
-
-loginBtn.onclick = async () => {
-  const email = prompt("管理者 email");
-  const pass  = prompt("管理者 password");
-  if(!email || !pass) return;
+document.getElementById("login").onclick = async () => {
+  const email = prompt("email");
+  const pass = prompt("password");
   await signInWithEmailAndPassword(auth, email, pass);
 };
 
-logoutBtn.onclick = async () => {
-  await signOut(auth);
-};
-
 onAuthStateChanged(auth, async (u)=>{
-  rowsEl.innerHTML = "";
-  if(!u){
-    statusEl.textContent = "未ログイン";
-    loginBtn.style.display = "";
-    logoutBtn.style.display = "none";
-    countEl.textContent = "総アクセス数: -";
-    return;
-  }
+  if(!u) return;
+  document.getElementById("status").textContent="ログイン中";
 
-  statusEl.textContent = `ログイン中: ${u.email}`;
-  loginBtn.style.display = "none";
-  logoutBtn.style.display = "";
-
-  // ✅ カウンター（counter フィールド）
   const c = await getDoc(doc(db,"stats","access"));
-  const counter = c.exists() ? (c.data().counter ?? 0) : 0;
-  countEl.textContent = "総アクセス数: " + counter;
+  document.getElementById("count").textContent =
+    "総アクセス数: " + (c.exists()?c.data().count:0);
 
-  // ✅ logs 読み出し（管理者だけ読めるルールにしてある前提）
-  const q = query(collection(db,"logs"), orderBy("time","desc"), limit(200));
+  const q = query(collection(db,"logs"), orderBy("time","desc"));
   const s = await getDocs(q);
-
+  const tbody = document.getElementById("rows");
   s.forEach(d=>{
-    const r = d.data();
-    const tr = document.createElement("tr");
-    const t = r.time?.toDate ? r.time.toDate().toLocaleString() : "";
-    tr.innerHTML = `
-      <td>${t}</td>
-      <td>${r.anonId ?? ""}</td>
-      <td>${r.page ?? ""} → ${r.next ?? ""}</td>
-      <td>${(r.ref ?? "").slice(0,60)}</td>
-      <td style="word-break:break-all">${(r.ua ?? "").slice(0,120)}</td>
-    `;
-    rowsEl.appendChild(tr);
+    const r=d.data();
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${r.time?.toDate()}</td><td>${r.anonId}</td><td>${r.ua}</td>`;
+    tbody.appendChild(tr);
   });
 });
 </script>
