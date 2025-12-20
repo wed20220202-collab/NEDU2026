@@ -13,21 +13,18 @@ body{
   padding:20px;
 }
 h2{margin-top:0}
-button,select{
-  padding:8px 14px;
-  border-radius:8px;
-  border:none;
-  font-weight:600;
-}
 button{
+  padding:8px 14px;
+  border:0;
+  border-radius:8px;
   background:#335dff;
   color:#fff;
+  font-weight:600;
   cursor:pointer;
 }
 button:hover{opacity:.9}
 #logout{background:#444;margin-left:8px}
 .small{opacity:.7;font-size:12px}
-.section{margin-top:22px}
 
 table{
   width:100%;
@@ -41,6 +38,22 @@ th,td{
   vertical-align:top;
 }
 th{opacity:.8}
+
+.calendar{
+  display:grid;
+  grid-template-columns: repeat(7,1fr);
+  gap:6px;
+  margin:10px 0 20px;
+}
+.day{
+  border:1px solid #333;
+  border-radius:6px;
+  padding:6px;
+  font-size:11px;
+  min-height:46px;
+}
+.day strong{display:block;font-size:12px}
+.day span{opacity:.7}
 </style>
 </head>
 
@@ -52,48 +65,28 @@ th{opacity:.8}
 <button id="login">管理者ログイン</button>
 <button id="logout" style="display:none">ログアウト</button>
 
-<div class="section">
-  <h3 id="count">総アクセス数：-</h3>
-</div>
+<hr>
 
-<div class="section">
-  <h3>📢 サイト公開設定</h3>
-  <select id="publishSelect">
-    <option value="true">公開</option>
-    <option value="false">非公開</option>
-  </select>
-  <button id="savePublish">保存</button>
-</div>
+<h3 id="count">総アクセス数：-</h3>
 
-<div class="section">
-  <h3>📊 日別アクセス集計</h3>
-  <table id="daily">
-    <thead>
-      <tr><th>日付</th><th>回数</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
+<button id="csv">📤 CSV ダウンロード</button>
 
-<div class="section">
-  <button id="csv">📤 CSV ダウンロード</button>
-</div>
+<h3>📊 日別アクセス</h3>
+<div id="calendar" class="calendar"></div>
 
-<div class="section">
-  <h3>📋 アクセスログ（最新200件）</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>time</th>
-        <th>anonId</th>
-        <th>page → to</th>
-        <th>referrer</th>
-        <th>UserAgent</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
-</div>
+<h3>📋 アクセスログ（最新200件）</h3>
+<table>
+<thead>
+<tr>
+  <th>time</th>
+  <th>anonId</th>
+  <th>page → to</th>
+  <th>referrer</th>
+  <th>UserAgent</th>
+</tr>
+</thead>
+<tbody id="rows"></tbody>
+</table>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
@@ -107,7 +100,6 @@ import {
   getFirestore,
   doc,
   getDoc,
-  setDoc,
   collection,
   getDocs,
   query,
@@ -120,6 +112,10 @@ const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
   projectId: "endlees-accescounter",
+  storageBucket: "endlees-accescounter.firebasestorage.app",
+  messagingSenderId: "70250476146",
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
+  measurementId: "G-T2XD6N46Z8"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -132,7 +128,7 @@ const loginBtn  = document.getElementById("login");
 const logoutBtn = document.getElementById("logout");
 const countEl   = document.getElementById("count");
 const rowsEl    = document.getElementById("rows");
-const dailyBody = document.querySelector("#daily tbody");
+const calEl     = document.getElementById("calendar");
 const csvBtn    = document.getElementById("csv");
 
 /* ログイン */
@@ -142,19 +138,20 @@ loginBtn.onclick = async () => {
   if(!email || !pass) return;
   try{
     await signInWithEmailAndPassword(auth, email, pass);
-  }catch{
+  }catch(e){
     alert("ログイン失敗");
   }
 };
 
 /* ログアウト */
-logoutBtn.onclick = () => signOut(auth);
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+};
 
 /* 認証状態 */
 onAuthStateChanged(auth, async (u)=>{
   rowsEl.innerHTML="";
-  dailyBody.innerHTML="";
-
+  calEl.innerHTML="";
   if(!u){
     statusEl.textContent="未ログイン";
     loginBtn.style.display="";
@@ -166,18 +163,13 @@ onAuthStateChanged(auth, async (u)=>{
   statusEl.textContent=`ログイン中：${u.email}`;
   loginBtn.style.display="none";
   logoutBtn.style.display="";
-
-  /* 総アクセス数 */
+  
+  /* 総カウンタ */
   const c = await getDoc(doc(db,"stats","access"));
   const total = c.exists() ? (c.data().count ?? 0) : 0;
   countEl.textContent = "総アクセス数：" + total;
 
-  /* 公開設定 */
-  const cfg = await getDoc(doc(db,"stats","config"));
-  document.getElementById("publishSelect").value =
-    cfg.exists() ? String(cfg.data().publish) : "true";
-
-  /* ログ取得 */
+  /* logs 読み込み */
   const q = query(
     collection(db,"access_logs"),
     orderBy("time","desc"),
@@ -188,17 +180,17 @@ onAuthStateChanged(auth, async (u)=>{
   const logs = [];
   snap.forEach(d => logs.push(d.data()));
 
-  renderLogs(logs);
-  renderDaily(logs);
+  renderTable(logs);
+  renderCalendar(logs);
   setupCSV(logs);
 });
 
-/* ログ表示 */
-function renderLogs(logs){
+/* テーブル描画 */
+function renderTable(logs){
   rowsEl.innerHTML="";
   logs.forEach(r=>{
     const tr=document.createElement("tr");
-    const t=r.time?.toDate?.().toLocaleString() ?? "";
+    const t = r.time?.toDate?.().toLocaleString() ?? "";
     tr.innerHTML=`
       <td>${t}</td>
       <td>${r.anonId ?? ""}</td>
@@ -210,24 +202,29 @@ function renderLogs(logs){
   });
 }
 
-/* 日別集計 */
-function renderDaily(logs){
-  const map={};
+/* 日別カレンダー */
+function renderCalendar(logs){
+  const map = {};
   logs.forEach(r=>{
     if(!r.time?.toDate) return;
-    const d=r.time.toDate().toISOString().slice(0,10);
-    map[d]=(map[d]||0)+1;
+    const d = r.time.toDate();
+    const key = d.toISOString().slice(0,10);
+    map[key] = (map[key]||0)+1;
   });
-  Object.keys(map).sort().forEach(d=>{
-    dailyBody.innerHTML+=`<tr><td>${d}</td><td>${map[d]}</td></tr>`;
+
+  Object.keys(map).sort().reverse().forEach(k=>{
+    const div=document.createElement("div");
+    div.className="day";
+    div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
+    calEl.appendChild(div);
   });
 }
 
 /* CSV */
 function setupCSV(logs){
-  csvBtn.onclick=()=>{
-    const head=["time","anonId","page","to","referrer","userAgent"];
-    const rows=logs.map(r=>[
+  csvBtn.onclick = () => {
+    const head = ["time","anonId","page","to","referrer","userAgent"];
+    const rows = logs.map(r => [
       r.time?.toDate?.().toISOString() ?? "",
       r.anonId ?? "",
       r.page ?? "",
@@ -235,20 +232,18 @@ function setupCSV(logs){
       r.referrer ?? "",
       (r.userAgent ?? "").replace(/"/g,'""')
     ]);
-    const csv=[head,...rows].map(r=>`"${r.join('","')}"`).join("\n");
+    const csv = [head, ...rows]
+      .map(r=>`"${r.join('","')}"`).join("\n");
+
+    const blob = new Blob([csv],{type:"text/csv"});
+    const url = URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+    a.href=url;
     a.download="access_logs.csv";
     a.click();
+    URL.revokeObjectURL(url);
   };
 }
-
-/* 公開設定保存 */
-document.getElementById("savePublish").onclick=async ()=>{
-  const v=document.getElementById("publishSelect").value==="true";
-  await setDoc(doc(db,"stats","config"),{publish:v},{merge:true});
-  alert("保存しました");
-};
 </script>
 
 </body>
