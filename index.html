@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="/favicon.ico?v=2">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-
   <style>
   body{margin:0;padding:0;background:#0e0e10;font-family:"Segoe UI",sans-serif;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh}
   .card{background:rgba(30,30,32,.85);padding:40px 35px;border-radius:16px;box-shadow:0 0 25px rgba(0,0,0,.6);width:360px;text-align:center;backdrop-filter:blur(6px);animation:fadeIn .7s ease}
@@ -25,13 +24,12 @@
 <div class="card">
   <h2>login画面</h2>
 
-  <!-- ✅ Firebaseカウンタ表示 -->
+  <!-- ✅ Firebaseカウンター表示 -->
   <div id="counter" class="small">👀 読み込み中…</div>
 
   <input id="pw" type="password" placeholder="パスワードを入力">
   <button onclick="loginTo('movie.html')">動画を開く</button>
   <button class="secondary" onclick="loginTo('viewer.html')">画像ビューアを開く</button>
-
   <div id="err" class="error">パスワードが違います</div>
   <div class="small">
     ※ログイン状態はタブを閉じると消えます<br>
@@ -41,15 +39,11 @@
 
 <script>
 /* =========================
-   設定（ログイン）
+   設定（ログイン部分）
 ========================= */
 const PASSWORD_HASH = "ab8a0075db27001e5d40f032435daf393b17b2c09b491ed75c7d3d1b4d51c3b8";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 
-/* ✅ 先にダミーを定義（Firebase準備前でもログインが壊れない） */
-window.logAfterLogin = async function(_nextPage){ /* noop */ };
-
-/* SHA-256 */
 async function sha256(text){
   const data = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", data);
@@ -57,21 +51,23 @@ async function sha256(text){
 }
 
 /* =========================
-   ログイン処理
+   ログイン処理（✅ログ失敗でもログインは止めない）
 ========================= */
 async function loginTo(nextPage){
   const input = document.getElementById("pw").value.trim();
   const inputHash = await sha256(input);
 
   if (inputHash === PASSWORD_HASH) {
-    // ✅ ログイン成功ログ（失敗してもログイン自体は続行）
+
+    // ✅ ログイン成功前提で「ログ保存（失敗しても続行）」
     try {
-      await window.logAfterLogin(nextPage);
-    } catch (e) {
+      if (typeof window.logAfterLogin === "function") {
+        await window.logAfterLogin(nextPage);
+      }
+    } catch(e) {
       console.warn("logAfterLogin failed:", e);
     }
 
-    // ログイン成功
     sessionStorage.setItem("loginOK", "1");
     sessionStorage.setItem("sid", Date.now() + "_" + Math.random().toString(36).slice(2));
     sessionStorage.setItem("loginAt", String(Date.now()));
@@ -84,23 +80,14 @@ async function loginTo(nextPage){
 }
 </script>
 
-<!-- =========================
-     ✅ Firebase / Firestore（アクセスカウンタ＋ログ）
-========================= -->
+<!-- ✅ Firebase（Firestore）アクセスカウンター＆ログ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import {
-  getFirestore,
-  doc,
-  runTransaction,
-  setDoc,
-  getDoc,
-  collection,
-  addDoc,
-  serverTimestamp
+  getFirestore, doc, runTransaction,
+  collection, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-/* あなたの Firebase 設定（そのままでOK） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
@@ -114,84 +101,60 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* 匿名端末ID（端末IDの代替。MACや本物の端末IDは取れない） */
+// 匿名ID（端末固有IDの代わり）
 let anonId = localStorage.getItem("anon_id");
 if (!anonId) {
   anonId = "anon_" + crypto.randomUUID();
   localStorage.setItem("anon_id", anonId);
 }
 
-/* ✅ カウンタ（indexを開いた回数） */
+// ✅ ページ表示時：カウンター +1 して表示
 const counterEl = document.getElementById("counter");
-const counterRef = doc(db, "stats", "access"); // stats/access に集計
+const accessRef = doc(db, "stats", "access");
 
-async function bumpCounterOncePerTab() {
-  // 連打防止（タブ内で1回だけ増やす）
-  if (!sessionStorage.getItem("counted_index")) {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      const cur = snap.exists() && typeof snap.data().count === "number" ? snap.data().count : 0;
-      tx.set(counterRef, { count: cur + 1, updatedAt: serverTimestamp() }, { merge: true });
-    });
-    sessionStorage.setItem("counted_index", "1");
-  }
+try {
+  const newCount = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(accessRef);
+    const current = snap.exists() ? (snap.data().counter ?? 0) : 0;
+    tx.set(accessRef, { counter: current + 1, updatedAt: serverTimestamp() }, { merge: true });
+    return current + 1;
+  });
 
-  // 表示（最新値を読む）
-  const s = await getDoc(counterRef);
-  const val = s.exists() ? (s.data().count ?? 0) : 0;
-  counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${val} 回`;
+  counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${newCount} 回`;
+} catch (e) {
+  console.warn(e);
+  counterEl.textContent = "👀 アクセス数を取得できませんでした";
 }
 
-/* ✅ “ログイン成功時”にアクセスログを保存する関数を注入 */
-window.logAfterLogin = async function(nextPage) {
-  const base = {
-    anonId,
-    page: "index",
-    to: nextPage,
+// ✅ ログイン成功後に呼ばれる関数（window に生やす）
+window.logAfterLogin = async function(nextPage){
+  const info = {
     time: serverTimestamp(),
-    referrer: document.referrer || "direct",
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    page: "index",
+    next: nextPage,
+    anonId,
+    ua: navigator.userAgent,
+    lang: navigator.language,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ref: document.referrer || "direct",
     screen: { w: screen.width, h: screen.height },
   };
 
+  // 位置情報（許可された場合のみ）
+  // ※ 許可ダイアログが出るのが嫌ならコメントアウトしてOK
+  if ("geolocation" in navigator) {
+    info.geo = "requested";
+  }
+
   // バッテリー（対応ブラウザのみ）
   if (navigator.getBattery) {
-    try {
-      const bat = await navigator.getBattery();
-      base.battery = { level: bat.level, charging: bat.charging };
-    } catch {}
+    const bat = await navigator.getBattery();
+    info.battery = { level: bat.level, charging: bat.charging };
   }
 
-  // 位置情報（許可した人だけ：勝手に取れない）
-  // ※必要なら true に
-  const GET_GEO = false;
-  if (GET_GEO && navigator.geolocation) {
-    await new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          base.geo = {
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            acc: pos.coords.accuracy
-          };
-          resolve();
-        },
-        () => resolve(),
-        { enableHighAccuracy: false, timeout: 3000, maximumAge: 600000 }
-      );
-    });
-  }
-
-  await addDoc(collection(db, "access_logs"), base);
+  // logs に追加
+  await addDoc(collection(db, "logs"), info);
 };
-
-/* 実行 */
-bumpCounterOncePerTab().catch(err => {
-  console.warn(err);
-  counterEl.textContent = "👀 カウンタ取得に失敗しました";
-});
 </script>
 
 </body>
