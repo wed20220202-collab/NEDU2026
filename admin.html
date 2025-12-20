@@ -4,94 +4,247 @@
 <meta charset="UTF-8">
 <title>Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-body{font-family:system-ui,sans-serif;background:#111;color:#fff;padding:20px}
-button{padding:10px 14px;border:0;border-radius:10px;background:#335dff;color:#fff;font-weight:700;cursor:pointer}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border-bottom:1px solid #333;padding:6px;font-size:12px;vertical-align:top}
+body{
+  font-family: system-ui, sans-serif;
+  background:#111;
+  color:#fff;
+  padding:20px;
+}
+h2{margin-top:0}
+button{
+  padding:8px 14px;
+  border:0;
+  border-radius:8px;
+  background:#335dff;
+  color:#fff;
+  font-weight:600;
+  cursor:pointer;
+}
+button:hover{opacity:.9}
+#logout{background:#444;margin-left:8px}
+.small{opacity:.7;font-size:12px}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+th,td{
+  border-bottom:1px solid #333;
+  padding:6px;
+  font-size:12px;
+  vertical-align:top;
+}
+th{opacity:.8}
+
+.calendar{
+  display:grid;
+  grid-template-columns: repeat(7,1fr);
+  gap:6px;
+  margin:10px 0 20px;
+}
+.day{
+  border:1px solid #333;
+  border-radius:6px;
+  padding:6px;
+  font-size:11px;
+  min-height:46px;
+}
+.day strong{display:block;font-size:12px}
+.day span{opacity:.7}
 </style>
 </head>
+
 <body>
 
-<h2>管理画面</h2>
+<h2>🔐 管理画面</h2>
+
 <div id="status">未ログイン</div>
 <button id="login">管理者ログイン</button>
+<button id="logout" style="display:none">ログアウト</button>
 
-<h3 id="count">総アクセス数: -</h3>
+<hr>
 
+<h3 id="count">総アクセス数：-</h3>
+
+<button id="csv">📤 CSV ダウンロード</button>
+
+<h3>📊 日別アクセス</h3>
+<div id="calendar" class="calendar"></div>
+
+<h3>📋 アクセスログ（最新200件）</h3>
 <table>
 <thead>
-<tr><th>time</th><th>anonId</th><th>to</th><th>UA</th></tr>
+<tr>
+  <th>time</th>
+  <th>anonId</th>
+  <th>page → to</th>
+  <th>referrer</th>
+  <th>UserAgent</th>
+</tr>
 </thead>
 <tbody id="rows"></tbody>
 </table>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, getDocs, orderBy, query, limit } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-// 🔥 index.html と同じ設定を必ず入れる
+/* 🔧 Firebase 設定（index.html と同じ） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
   projectId: "endlees-accescounter",
   storageBucket: "endlees-accescounter.firebasestorage.app",
   messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb"
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
+  measurementId: "G-T2XD6N46Z8"
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// 🔐 ログインボタン
-document.getElementById("login").onclick = async () => {
+/* UI */
+const statusEl = document.getElementById("status");
+const loginBtn  = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const countEl   = document.getElementById("count");
+const rowsEl    = document.getElementById("rows");
+const calEl     = document.getElementById("calendar");
+const csvBtn    = document.getElementById("csv");
+
+/* ログイン */
+loginBtn.onclick = async () => {
   const email = prompt("管理者メール");
   const pass  = prompt("管理者パスワード");
-  if (!email || !pass) return;
-
-  try {
+  if(!email || !pass) return;
+  try{
     await signInWithEmailAndPassword(auth, email, pass);
-  } catch (e) {
-    alert("ログイン失敗：" + e.message);
+  }catch(e){
+    alert("ログイン失敗");
   }
 };
 
-// 🔄 ログイン後処理
-onAuthStateChanged(auth, async (user)=>{
-  if(!user) return;
+/* ログアウト */
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+};
 
-  document.getElementById("status").textContent =
-    "ログイン中: " + user.email;
+/* 認証状態 */
+onAuthStateChanged(auth, async (u)=>{
+  rowsEl.innerHTML="";
+  calEl.innerHTML="";
+  if(!u){
+    statusEl.textContent="未ログイン";
+    loginBtn.style.display="";
+    logoutBtn.style.display="none";
+    countEl.textContent="総アクセス数：-";
+    return;
+  }
 
-  // カウンタ
+  statusEl.textContent=`ログイン中：${u.email}`;
+  loginBtn.style.display="none";
+  logoutBtn.style.display="";
+  
+  /* 総カウンタ */
   const c = await getDoc(doc(db,"stats","access"));
-  document.getElementById("count").textContent =
-    "総アクセス数: " + (c.exists() ? c.data().count : 0);
+  const total = c.exists() ? (c.data().count ?? 0) : 0;
+  countEl.textContent = "総アクセス数：" + total;
 
-  // ログ一覧（最新100件）
+  /* logs 読み込み */
   const q = query(
     collection(db,"access_logs"),
     orderBy("time","desc"),
-    limit(100)
+    limit(200)
   );
-  const s = await getDocs(q);
+  const snap = await getDocs(q);
 
-  const tbody = document.getElementById("rows");
-  tbody.innerHTML = "";
-  s.forEach(d=>{
-    const r = d.data();
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.time?.toDate().toLocaleString() ?? ""}</td>
+  const logs = [];
+  snap.forEach(d => logs.push(d.data()));
+
+  renderTable(logs);
+  renderCalendar(logs);
+  setupCSV(logs);
+});
+
+/* テーブル描画 */
+function renderTable(logs){
+  rowsEl.innerHTML="";
+  logs.forEach(r=>{
+    const tr=document.createElement("tr");
+    const t = r.time?.toDate?.().toLocaleString() ?? "";
+    tr.innerHTML=`
+      <td>${t}</td>
       <td>${r.anonId ?? ""}</td>
-      <td>${r.to ?? ""}</td>
+      <td>${r.page ?? ""} → ${r.to ?? ""}</td>
+      <td>${(r.referrer ?? "").slice(0,40)}</td>
       <td style="word-break:break-all">${(r.userAgent ?? "").slice(0,120)}</td>
     `;
-    tbody.appendChild(tr);
+    rowsEl.appendChild(tr);
   });
-});
+}
+
+/* 日別カレンダー */
+function renderCalendar(logs){
+  const map = {};
+  logs.forEach(r=>{
+    if(!r.time?.toDate) return;
+    const d = r.time.toDate();
+    const key = d.toISOString().slice(0,10);
+    map[key] = (map[key]||0)+1;
+  });
+
+  Object.keys(map).sort().reverse().forEach(k=>{
+    const div=document.createElement("div");
+    div.className="day";
+    div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
+    calEl.appendChild(div);
+  });
+}
+
+/* CSV */
+function setupCSV(logs){
+  csvBtn.onclick = () => {
+    const head = ["time","anonId","page","to","referrer","userAgent"];
+    const rows = logs.map(r => [
+      r.time?.toDate?.().toISOString() ?? "",
+      r.anonId ?? "",
+      r.page ?? "",
+      r.to ?? "",
+      r.referrer ?? "",
+      (r.userAgent ?? "").replace(/"/g,'""')
+    ]);
+    const csv = [head, ...rows]
+      .map(r=>`"${r.join('","')}"`).join("\n");
+
+    const blob = new Blob([csv],{type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="access_logs.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+}
 </script>
+
 </body>
 </html>
