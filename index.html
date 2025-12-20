@@ -24,10 +24,14 @@
 <body oncontextmenu="return false">
 <div class="card">
   <h2>login画面</h2>
+
+  <!-- ✅ Firebaseカウンタ表示 -->
   <div id="counter" class="small">👀 読み込み中…</div>
+
   <input id="pw" type="password" placeholder="パスワードを入力">
   <button onclick="loginTo('movie.html')">動画を開く</button>
   <button class="secondary" onclick="loginTo('viewer.html')">画像ビューアを開く</button>
+
   <div id="err" class="error">パスワードが違います</div>
   <div class="small">
     ※ログイン状態はタブを閉じると消えます<br>
@@ -37,23 +41,19 @@
 
 <script>
 /* =========================
-   設定
+   設定（ログイン）
 ========================= */
-
 const PASSWORD_HASH = "ab8a0075db27001e5d40f032435daf393b17b2c09b491ed75c7d3d1b4d51c3b8";
-
-// 自動ログアウト時間（20分）
 const SESSION_TTL_MS = 20 * 60 * 1000;
 
-/* =========================
-   SHA-256 関数
-========================= */
+/* ✅ 先にダミーを定義（Firebase準備前でもログインが壊れない） */
+window.logAfterLogin = async function(_nextPage){ /* noop */ };
+
+/* SHA-256 */
 async function sha256(text){
   const data = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 /* =========================
@@ -61,72 +61,46 @@ async function sha256(text){
 ========================= */
 async function loginTo(nextPage){
   const input = document.getElementById("pw").value.trim();
-
-  // 入力をハッシュ化
   const inputHash = await sha256(input);
 
   if (inputHash === PASSWORD_HASH) {
-    await window.logAfterLogin()
+    // ✅ ログイン成功ログ（失敗してもログイン自体は続行）
+    try {
+      await window.logAfterLogin(nextPage);
+    } catch (e) {
+      console.warn("logAfterLogin failed:", e);
+    }
 
     // ログイン成功
     sessionStorage.setItem("loginOK", "1");
-    sessionStorage.setItem(
-      "sid",
-      Date.now() + "_" + Math.random().toString(36).slice(2)
-    );
+    sessionStorage.setItem("sid", Date.now() + "_" + Math.random().toString(36).slice(2));
     sessionStorage.setItem("loginAt", String(Date.now()));
     sessionStorage.setItem("ttl", String(SESSION_TTL_MS));
 
-    // 画面遷移
     location.replace(nextPage);
   } else {
     document.getElementById("err").style.display = "block";
   }
 }
-
-
-/* =========================
-   アクセスカウンター（index専用）
-   Firebase不要 / 登録不要
-========================= */
-
-const NAMESPACE = "nedu2026-f5-si"; // サイト識別子（自由）
-const KEY = "index-access";        // index.html 専用
-
-// 🔹 リロード連打防止（1タブ1回）
-if (!sessionStorage.getItem("counted")) {
-  fetch(`https://api.countapi.xyz/hit/${NAMESPACE}/${KEY}`)
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById("counter").textContent =
-        `👨‍👩‍👧‍👦 このページを開いた人の数： ${data.value} 回`;
-    })
-    .catch(() => {
-      document.getElementById("counter").textContent =
-        "👀 アクセス数を取得できませんでした";
-    });
-
-  sessionStorage.setItem("counted", "1");
-} else {
-  // すでにカウント済みでも表示だけは取得
-  fetch(`https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`)
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById("counter").textContent =
-        `👨‍👩‍👧‍👦 このページを開いた人の数： ${data.value}回`;
-    });
-}
 </script>
+
+<!-- =========================
+     ✅ Firebase / Firestore（アクセスカウンタ＋ログ）
+========================= -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import {
   getFirestore,
+  doc,
+  runTransaction,
+  setDoc,
+  getDoc,
   collection,
   addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
 
+/* あなたの Firebase 設定（そのままでOK） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
@@ -139,52 +113,86 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const analytics = getAnalytics(app);
 
-// 匿名端末ID
+/* 匿名端末ID（端末IDの代替。MACや本物の端末IDは取れない） */
 let anonId = localStorage.getItem("anon_id");
 if (!anonId) {
   anonId = "anon_" + crypto.randomUUID();
   localStorage.setItem("anon_id", anonId);
 }
 
-// 🔐 ログイン成功後に呼ぶ関数
-window.logAfterLogin = async function () {
+/* ✅ カウンタ（indexを開いた回数） */
+const counterEl = document.getElementById("counter");
+const counterRef = doc(db, "stats", "access"); // stats/access に集計
 
-  // 基本情報
-  const info = {
+async function bumpCounterOncePerTab() {
+  // 連打防止（タブ内で1回だけ増やす）
+  if (!sessionStorage.getItem("counted_index")) {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterRef);
+      const cur = snap.exists() && typeof snap.data().count === "number" ? snap.data().count : 0;
+      tx.set(counterRef, { count: cur + 1, updatedAt: serverTimestamp() }, { merge: true });
+    });
+    sessionStorage.setItem("counted_index", "1");
+  }
+
+  // 表示（最新値を読む）
+  const s = await getDoc(counterRef);
+  const val = s.exists() ? (s.data().count ?? 0) : 0;
+  counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${val} 回`;
+}
+
+/* ✅ “ログイン成功時”にアクセスログを保存する関数を注入 */
+window.logAfterLogin = async function(nextPage) {
+  const base = {
     anonId,
     page: "index",
+    to: nextPage,
     time: serverTimestamp(),
+    referrer: document.referrer || "direct",
     userAgent: navigator.userAgent,
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    screen: {
-      w: screen.width,
-      h: screen.height
-    },
-    referrer: document.referrer || "direct"
+    screen: { w: screen.width, h: screen.height },
   };
 
   // バッテリー（対応ブラウザのみ）
   if (navigator.getBattery) {
-    const bat = await navigator.getBattery();
-    info.battery = {
-      level: bat.level,
-      charging: bat.charging
-    };
+    try {
+      const bat = await navigator.getBattery();
+      base.battery = { level: bat.level, charging: bat.charging };
+    } catch {}
   }
 
-  // Firestore に保存
-  await addDoc(collection(db, "access_logs"), info);
+  // 位置情報（許可した人だけ：勝手に取れない）
+  // ※必要なら true に
+  const GET_GEO = false;
+  if (GET_GEO && navigator.geolocation) {
+    await new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          base.geo = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            acc: pos.coords.accuracy
+          };
+          resolve();
+        },
+        () => resolve(),
+        { enableHighAccuracy: false, timeout: 3000, maximumAge: 600000 }
+      );
+    });
+  }
 
-  // Analytics イベント
-  logEvent(analytics, "login_success", {
-    page: "index"
-  });
+  await addDoc(collection(db, "access_logs"), base);
 };
-</script>
 
+/* 実行 */
+bumpCounterOncePerTab().catch(err => {
+  console.warn(err);
+  counterEl.textContent = "👀 カウンタ取得に失敗しました";
+});
+</script>
 
 </body>
 </html>
