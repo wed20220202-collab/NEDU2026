@@ -157,12 +157,12 @@ logoutBtn.onclick = async () => {
 
 /* 認証状態 */
 onAuthStateChanged(auth, async (u)=>{
+  if (!u) return;
 
-  // 公開設定 読み込み
   const cfgRef = doc(db, "stats", "config");
   const cfgSnap = await getDoc(cfgRef);
 
-  document.getElementById("publishSelect").value =
+  publishSelect.value =
     cfgSnap.exists() ? String(cfgSnap.data().publish) : "true";
 
   rowsEl.innerHTML="";
