@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>404 | ページが見つかりません</title>
+
+<style>
+  :root{
+    --bg1:#fff7e6;
+    --bg2:#fdebd0;
+    --text:#5a4634;
+    --accent:#f39c12;
+    --accent2:#e67e22;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",system-ui,sans-serif;
+    color:var(--text);
+    overflow:hidden;
+    background: linear-gradient(to bottom, var(--bg1), var(--bg2));
+  }
+
+  /* =========================
+     雲（背景）
+  ========================= */
+  .sky{
+    position:fixed;
+    inset:0;
+    overflow:hidden;
+  }
+  .cloud{
+    position:absolute;
+    top:var(--top);
+    left:-30%;
+    width:var(--w);
+    height:var(--h);
+    background: rgba(255,255,255,0.75);
+    filter: blur(0.2px);
+    border-radius: 999px;
+    box-shadow:
+      40px 10px 0 rgba(255,255,255,0.70),
+      80px 0px 0 rgba(255,255,255,0.65),
+      120px 12px 0 rgba(255,255,255,0.70);
+    animation: drift var(--dur) linear infinite;
+    opacity: var(--op);
+  }
+  @keyframes drift{
+    from{ transform: translateX(0); }
+    to  { transform: translateX(170%); }
+  }
+
+  /* =========================
+     花びら（前景）
+  ========================= */
+  .petals{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    overflow:hidden;
+  }
+  .petal{
+    position:absolute;
+    top:-10vh;
+    left:var(--x);
+    width:var(--s);
+    height:calc(var(--s) * 0.72);
+    background: rgba(255, 153, 204, 0.75);
+    border-radius: 999px 999px 999px 999px;
+    transform: rotate(var(--r));
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.08));
+    animation:
+      fall var(--t) linear infinite,
+      sway calc(var(--t) * 0.55) ease-in-out infinite alternate;
+    opacity: var(--o);
+  }
+  .petal::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%);
+    border-radius: inherit;
+  }
+  @keyframes fall{
+    to{ transform: translateY(120vh) rotate(calc(var(--r) + 180deg)); }
+  }
+  @keyframes sway{
+    from{ margin-left:-22px; }
+    to  { margin-left: 22px; }
+  }
+
+  /* =========================
+     中央カード
+  ========================= */
+  .wrap{
+    position:relative;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    z-index:2;
+  }
+  .card{
+    width:min(520px, 100%);
+    background: rgba(255,255,255,0.82);
+    border:1px solid rgba(255,255,255,0.6);
+    border-radius:22px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.12);
+    padding:34px 26px;
+    text-align:center;
+    backdrop-filter: blur(6px);
+  }
+  .code{
+    font-size:76px;
+    margin:0;
+    color:var(--accent);
+    letter-spacing:2px;
+  }
+  .title{
+    margin:8px 0 16px;
+    font-size:20px;
+  }
+  .msg{
+    margin:0 0 22px;
+    line-height:1.9;
+    font-size:15px;
+  }
+  .btns{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  a.btn{
+    display:inline-block;
+    padding:12px 18px;
+    border-radius:999px;
+    text-decoration:none;
+    font-weight:700;
+    transition: transform .15s ease, background .2s ease;
+    user-select:none;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#fff;
+  }
+  .btn-primary:hover{ background:var(--accent2); transform: translateY(-1px) scale(1.03); }
+  .btn-ghost{
+    background: rgba(90,70,52,0.08);
+    color:var(--text);
+  }
+  .btn-ghost:hover{ background: rgba(90,70,52,0.12); transform: translateY(-1px) scale(1.03); }
+
+  .small{
+    margin-top:16px;
+    font-size:12px;
+    opacity:.72;
+  }
+
+  /* 画面下のやさしい一言 */
+  .footer{
+    position:fixed;
+    left:0; right:0; bottom:14px;
+    text-align:center;
+    font-size:12px;
+    opacity:.65;
+    z-index:2;
+    pointer-events:none;
+  }
+
+  /* 動きが苦手な人向け */
+  @media (prefers-reduced-motion: reduce){
+    .cloud, .petal{ animation:none !important; }
+  }
+</style>
+</head>
+
+<body>
+  <!-- 背景：雲 -->
+  <div class="sky" aria-hidden="true">
+    <div class="cloud" style="--top:10%; --w:220px; --h:60px; --dur:55s; --op:.55;"></div>
+    <div class="cloud" style="--top:22%; --w:320px; --h:80px; --dur:75s; --op:.50;"></div>
+    <div class="cloud" style="--top:38%; --w:260px; --h:70px; --dur:62s; --op:.45;"></div>
+    <div class="cloud" style="--top:55%; --w:380px; --h:90px; --dur:88s; --op:.42;"></div>
+    <div class="cloud" style="--top:70%; --w:240px; --h:65px; --dur:58s; --op:.38;"></div>
+  </div>
+
+  <!-- 前景：花びら -->
+  <div class="petals" id="petals" aria-hidden="true"></div>
+
+  <!-- 中央：案内 -->
+  <main class="wrap" role="main">
+    <section class="card">
+      <h1 class="code">404</h1>
+      <h2 class="title">ページが見つかりません</h2>
+      <p class="msg">
+        このページは、思い出のアルバムの中へ<br>
+        そっと旅立ってしまったようです。<br>
+        よかったら、謝恩会の動画へどうぞ🌸
+      </p>
+
+      <div class="btns">
+        <a class="btn btn-primary" id="toVideo" href="https://nedu2026.f5.si/movie.html">謝恩会動画を開く</a>
+        <a class="btn btn-ghost" id="toHome"  href="https://nedu2026.f5.si/">トップへ戻る</a>
+        <a class="btn btn-ghost" href="javascript:history.back()">ひとつ前へ戻る</a>
+      </div>
+
+      <div class="small" id="hint">数秒後に自動で動画ページへご案内します…</div>
+    </section>
+  </main>
+
+  <div class="footer">NEDU 2026 / Thanks to all teachers & families</div>
+
+<script>
+  // =========================
+  // 設定（必要ならここだけ変更）
+  // =========================
+  const VIDEO_URL = "https://nedu2026.f5.si/movie.html";
+  const HOME_URL  = "https://nedu2026.f5.si/";
+  const AUTO_REDIRECT_SEC = 8;   // 0にすると自動遷移なし
+
+  // ボタンのURLも統一
+  document.getElementById("toVideo").href = VIDEO_URL;
+  document.getElementById("toHome").href  = HOME_URL;
+
+  // =========================
+  // 花びら生成
+  // =========================
+  const petals = document.getElementById("petals");
+
+  function addPetal() {
+    const p = document.createElement("span");
+    p.className = "petal";
+
+    const x = Math.random() * 100;                 // vw
+    const s = 10 + Math.random() * 16;             // px
+    const r = (-40 + Math.random() * 80) + "deg";  // rotation
+    const t = 8 + Math.random() * 8;               // sec
+    const o = 0.35 + Math.random() * 0.55;
+
+    p.style.setProperty("--x", x + "vw");
+    p.style.setProperty("--s", s + "px");
+    p.style.setProperty("--r", r);
+    p.style.setProperty("--t", t + "s");
+    p.style.setProperty("--o", o);
+
+    petals.appendChild(p);
+
+    // 一定時間でDOM軽量化
+    setTimeout(() => p.remove(), (t + 2) * 1000);
+  }
+
+  // 初期投入
+  for (let i = 0; i < 18; i++) {
+    setTimeout(addPetal, i * 220);
+  }
+  // 継続投入
+  const petalTimer = setInterval(addPetal, 350);
+
+  // prefers-reduced-motion の場合は止める
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    clearInterval(petalTimer);
+    document.getElementById("hint").textContent = "トップに戻るか、動画ページへ進んでください。";
+  }
+
+  // =========================
+  // 自動で動画へ誘導（必要なら）
+  // =========================
+  if (AUTO_REDIRECT_SEC > 0) {
+    let left = AUTO_REDIRECT_SEC;
+    const hint = document.getElementById("hint");
+
+    const tick = setInterval(() => {
+      left--;
+      if (left <= 0) {
+        clearInterval(tick);
+        location.href = VIDEO_URL;
+        return;
+      }
+      hint.textContent = `${left}秒後に自動で動画ページへご案内します…`;
+    }, 1000);
+  } else {
+    document.getElementById("hint").textContent = "トップに戻るか、動画ページへ進んでください。";
+  }
+</script>
+</body>
+</html>
