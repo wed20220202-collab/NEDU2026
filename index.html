@@ -19,12 +19,12 @@
   input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
   .small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
   </style>
-  <div id="counter" class="small">👀 読み込み中…</div>
 </head>
 
 <body oncontextmenu="return false">
 <div class="card">
   <h2>login画面</h2>
+  <div id="counter" class="small">👀 読み込み中…</div>
   <input id="pw" type="password" placeholder="パスワードを入力">
   <button onclick="loginTo('movie.html')">動画を開く</button>
   <button class="secondary" onclick="loginTo('viewer.html')">画像ビューアを開く</button>
@@ -66,6 +66,8 @@ async function loginTo(nextPage){
   const inputHash = await sha256(input);
 
   if (inputHash === PASSWORD_HASH) {
+    await window.logAfterLogin()
+
     // ログイン成功
     sessionStorage.setItem("loginOK", "1");
     sessionStorage.setItem(
@@ -115,6 +117,74 @@ if (!sessionStorage.getItem("counted")) {
     });
 }
 </script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
+  authDomain: "endlees-accescounter.firebaseapp.com",
+  projectId: "endlees-accescounter",
+  storageBucket: "endlees-accescounter.firebasestorage.app",
+  messagingSenderId: "70250476146",
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
+  measurementId: "G-T2XD6N46Z8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const analytics = getAnalytics(app);
+
+// 匿名端末ID
+let anonId = localStorage.getItem("anon_id");
+if (!anonId) {
+  anonId = "anon_" + crypto.randomUUID();
+  localStorage.setItem("anon_id", anonId);
+}
+
+// 🔐 ログイン成功後に呼ぶ関数
+window.logAfterLogin = async function () {
+
+  // 基本情報
+  const info = {
+    anonId,
+    page: "index",
+    time: serverTimestamp(),
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    screen: {
+      w: screen.width,
+      h: screen.height
+    },
+    referrer: document.referrer || "direct"
+  };
+
+  // バッテリー（対応ブラウザのみ）
+  if (navigator.getBattery) {
+    const bat = await navigator.getBattery();
+    info.battery = {
+      level: bat.level,
+      charging: bat.charging
+    };
+  }
+
+  // Firestore に保存
+  await addDoc(collection(db, "access_logs"), info);
+
+  // Analytics イベント
+  logEvent(analytics, "login_success", {
+    page: "index"
+  });
+};
+</script>
+
 
 </body>
 </html>
