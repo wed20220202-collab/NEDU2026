@@ -25,12 +25,13 @@
 <div class="card">
   <h2>login画面</h2>
 
-  <!-- ✅ Firebaseカウンタ表示 -->
   <div id="counter" class="small">👀 読み込み中…</div>
 
   <input id="pw" type="password" placeholder="パスワードを入力">
-  <button onclick="loginTo('movie.html')">動画を開く</button>
-  <button class="secondary" onclick="loginTo('viewer.html')">画像ビューアを開く</button>
+
+  <!-- ✅ data-to に遷移先を持たせる（これが一番確実） -->
+  <button data-to="movie.html" onclick="loginToFromBtn(this)">動画を開く</button>
+  <button class="secondary" data-to="viewer.html" onclick="loginToFromBtn(this)">画像ビューアを開く</button>
 
   <div id="err" class="error">パスワードが違います</div>
   <div class="small">
@@ -46,38 +47,37 @@
 const PASSWORD_HASH = "ab8a0075db27001e5d40f032435daf393b17b2c09b491ed75c7d3d1b4d51c3b8";
 const SESSION_TTL_MS = 20 * 60 * 1000;
 
-/* ✅ 先にダミーを定義（Firebase準備前でもログインが壊れない） */
-window.logAfterLogin = async function(_nextPage){ /* noop */ };
+// ✅ Firebase準備前でも壊れないダミー
+window.logAfterLogin = async function(_to){};
 
-/* SHA-256 */
 async function sha256(text){
   const data = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-/* =========================
-   ログイン処理
-========================= */
-async function loginTo(nextPage){
+async function loginToFromBtn(btn){
+  const to = btn?.dataset?.to || "movie.html"; // ここで確実に決まる
+  await loginTo(to);
+}
+
+async function loginTo(to){
   const input = document.getElementById("pw").value.trim();
   const inputHash = await sha256(input);
 
   if (inputHash === PASSWORD_HASH) {
-    // ✅ ログイン成功ログ（失敗してもログイン自体は続行）
     try {
-      await window.logAfterLogin(nextPage);
+      await window.logAfterLogin(to); // ✅ ここで「押したボタンの to」を渡す
     } catch (e) {
       console.warn("logAfterLogin failed:", e);
     }
 
-    // ログイン成功
     sessionStorage.setItem("loginOK", "1");
     sessionStorage.setItem("sid", Date.now() + "_" + Math.random().toString(36).slice(2));
     sessionStorage.setItem("loginAt", String(Date.now()));
     sessionStorage.setItem("ttl", String(SESSION_TTL_MS));
 
-    location.replace(nextPage);
+    location.replace(to);
   } else {
     document.getElementById("err").style.display = "block";
   }
@@ -85,7 +85,7 @@ async function loginTo(nextPage){
 </script>
 
 <!-- =========================
-     ✅ Firebase / Firestore（アクセスカウンタ＋ログ）
+     Firebase / Firestore（アクセスカウンタ＋ログ）
 ========================= -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
@@ -93,14 +93,12 @@ import {
   getFirestore,
   doc,
   runTransaction,
-  setDoc,
   getDoc,
   collection,
   addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-/* あなたの Firebase 設定（そのままでOK） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
@@ -114,19 +112,18 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* 匿名端末ID（端末IDの代替。MACや本物の端末IDは取れない） */
+// 匿名ID
 let anonId = localStorage.getItem("anon_id");
 if (!anonId) {
   anonId = "anon_" + crypto.randomUUID();
   localStorage.setItem("anon_id", anonId);
 }
 
-/* ✅ カウンタ（indexを開いた回数） */
+// ✅ カウンター：stats/access の count を増やす（1タブ1回）
 const counterEl = document.getElementById("counter");
-const counterRef = doc(db, "stats", "access"); // stats/access に集計
+const counterRef = doc(db, "stats", "access");
 
 async function bumpCounterOncePerTab() {
-  // 連打防止（タブ内で1回だけ増やす）
   if (!sessionStorage.getItem("counted_index")) {
     await runTransaction(db, async (tx) => {
       const snap = await tx.get(counterRef);
@@ -135,19 +132,17 @@ async function bumpCounterOncePerTab() {
     });
     sessionStorage.setItem("counted_index", "1");
   }
-
-  // 表示（最新値を読む）
   const s = await getDoc(counterRef);
   const val = s.exists() ? (s.data().count ?? 0) : 0;
   counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${val} 回`;
 }
 
-/* ✅ “ログイン成功時”にアクセスログを保存する関数を注入 */
-window.logAfterLogin = async function(nextPage) {
+// ✅ ログイン成功ログ（押したボタンの遷移先 to をそのまま保存）
+window.logAfterLogin = async function(to) {
   const base = {
     anonId,
     page: "index",
-    to: nextPage,   // ← ここが全て
+    to, // ✅ ここが確実に viewer.html / movie.html になる
     time: serverTimestamp(),
     referrer: document.referrer || "direct",
     userAgent: navigator.userAgent,
@@ -166,7 +161,6 @@ window.logAfterLogin = async function(nextPage) {
   await addDoc(collection(db, "access_logs"), base);
 };
 
-/* 実行 */
 bumpCounterOncePerTab().catch(err => {
   console.warn(err);
   counterEl.textContent = "👀 カウンタ取得に失敗しました";

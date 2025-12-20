@@ -206,7 +206,7 @@ function renderTable(logs){
 function renderCalendar(logs){
   const map = {};
   logs.forEach(r=>{
-    if(!r.time?.toDate+1) return;
+    if(!r.time?.toDate) return;
     const d = r.time.toDate();
     const key = d.toISOString().slice(0,10);
     map[key] = (map[key]||0)+1;
