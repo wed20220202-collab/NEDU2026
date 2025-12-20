@@ -18,6 +18,13 @@
   input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
   .small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
   </style>
+  <div id="adminBtn" style="
+  position:fixed;
+  top:12px;
+  right:14px;
+  font-size:20px;
+  cursor:pointer;
+  opacity:.6">⚙</div>
 </head>
 
 <body oncontextmenu="return false">
@@ -87,48 +94,41 @@ import {
   getFirestore, doc, runTransaction,
   collection, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
-  authDomain: "endlees-accescounter.firebaseapp.com",
-  projectId: "endlees-accescounter",
-  storageBucket: "endlees-accescounter.firebasestorage.app",
-  messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
-  measurementId: "G-T2XD6N46Z8"
-};
-
+const firebaseConfig = { /* あなたの設定 */ };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// 匿名ID（端末固有IDの代わり）
+// 匿名ID
 let anonId = localStorage.getItem("anon_id");
 if (!anonId) {
   anonId = "anon_" + crypto.randomUUID();
   localStorage.setItem("anon_id", anonId);
 }
 
-// ✅ ページ表示時：カウンター +1 して表示
+// カウンター
 const counterEl = document.getElementById("counter");
-const accessRef = doc(db, "stats", "access");
+const accessRef = doc(db,"stats","access");
 
 try {
-  const newCount = await runTransaction(db, async (tx) => {
-    const snap = await tx.get(accessRef);
-    const current = snap.exists() ? (snap.data().counter ?? 0) : 0;
-    tx.set(accessRef, { counter: current + 1, updatedAt: serverTimestamp() }, { merge: true });
-    return current + 1;
+  const newCount = await runTransaction(db, async tx=>{
+    const s = await tx.get(accessRef);
+    const c = s.exists()? (s.data().counter??0):0;
+    tx.set(accessRef,{counter:c+1,updatedAt:serverTimestamp()},{merge:true});
+    return c+1;
   });
-
-  counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${newCount} 回`;
-} catch (e) {
-  console.warn(e);
-  counterEl.textContent = "👀 アクセス数を取得できませんでした";
+  counterEl.textContent = `訪問数：${newCount}`;
+} catch {
+  counterEl.textContent = "取得失敗";
 }
 
-// ✅ ログイン成功後に呼ばれる関数（window に生やす）
-window.logAfterLogin = async function(nextPage){
-  const info = {
+// ログイン成功ログ
+window.logAfterLogin = async (nextPage)=>{
+  await addDoc(collection(db,"logs"),{
     time: serverTimestamp(),
     page: "index",
     next: nextPage,
@@ -136,24 +136,17 @@ window.logAfterLogin = async function(nextPage){
     ua: navigator.userAgent,
     lang: navigator.language,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    ref: document.referrer || "direct",
-    screen: { w: screen.width, h: screen.height },
-  };
+    ref: document.referrer||"direct",
+    screen:{w:screen.width,h:screen.height}
+  });
+};
 
-  // 位置情報（許可された場合のみ）
-  // ※ 許可ダイアログが出るのが嫌ならコメントアウトしてOK
-  if ("geolocation" in navigator) {
-    info.geo = "requested";
-  }
-
-  // バッテリー（対応ブラウザのみ）
-  if (navigator.getBattery) {
-    const bat = await navigator.getBattery();
-    info.battery = { level: bat.level, charging: bat.charging };
-  }
-
-  // logs に追加
-  await addDoc(collection(db, "logs"), info);
+// 管理画面ボタン
+document.getElementById("adminBtn").onclick = async ()=>{
+  const email = prompt("管理者email");
+  const pass  = prompt("管理者password");
+  await signInWithEmailAndPassword(auth,email,pass);
+  location.href="admin.html";
 };
 </script>
 
