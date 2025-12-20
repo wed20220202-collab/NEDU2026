@@ -147,7 +147,7 @@ window.logAfterLogin = async function(nextPage) {
   const base = {
     anonId,
     page: "index",
-    to: nextPage,
+    to: nextPage,   // ← ここが全て
     time: serverTimestamp(),
     referrer: document.referrer || "direct",
     userAgent: navigator.userAgent,
@@ -156,7 +156,6 @@ window.logAfterLogin = async function(nextPage) {
     screen: { w: screen.width, h: screen.height },
   };
 
-  // バッテリー（対応ブラウザのみ）
   if (navigator.getBattery) {
     try {
       const bat = await navigator.getBattery();
@@ -164,35 +163,7 @@ window.logAfterLogin = async function(nextPage) {
     } catch {}
   }
 
-  // 位置情報（許可した人だけ：勝手に取れない）
-  // ※必要なら true に
-  const GET_GEO = false;
-  if (GET_GEO && navigator.geolocation) {
-    await new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          base.geo = {
-            lat: pos.coords.latitude,
-            lon: pos.coords.longitude,
-            acc: pos.coords.accuracy
-          };
-          resolve();
-        },
-        () => resolve(),
-        { enableHighAccuracy: false, timeout: 3000, maximumAge: 600000 }
-      );
-    });
-  }
-
-  await addDoc(collection(db, "access_logs"), {
-  anonId: "...",
-  page: "index",
-  to: "movie.html",
-  time: serverTimestamp(),
-  userAgent: "...",
-  screen: { w: 1920, h: 1080 }
-});
-
+  await addDoc(collection(db, "access_logs"), base);
 };
 
 /* 実行 */
