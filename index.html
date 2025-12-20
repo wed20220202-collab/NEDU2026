@@ -99,7 +99,10 @@ import {
   addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-
+const cfg = await getDoc(doc(db,"stats","config"));
+if(cfg.exists() && cfg.data().publish === false){
+  document.body.innerHTML = "<h2 style='color:white'>現在サイトは非公開です</h2>";
+}
 /* あなたの Firebase 設定（そのままでOK） */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
