@@ -16,10 +16,10 @@
   input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
   .small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
   </style>
+  <div id="counter" class="small">👀 読み込み中…</div>
 </head>
 
 <body oncontextmenu="return false">
-<table border="0" cellspacing="0" cellpadding="0"><tr><td align="center"><a href="http://www.rays-counter.com/"><img src="http://www.rays-counter.com/d1304_f6_359/6942cd3674643/" alt="アクセスカウンター" border="0"></a></td></tr><tr><td align="center"><img src="http://www.rays-counter.com/images/counter_01.gif" border="0"><img src="http://www.rays-counter.com/images/counter_02.gif" border="0"><img src="http://www.rays-counter.com/images/counter_03.gif" border="0" alt=""><img src="http://www.rays-counter.com/images/counter_04.gif" border="0"><img src="http://www.rays-counter.com/images/counter_05.gif" border="0" ></td></tr></table>
 <div class="card">
   <h2>login画面</h2>
   <input id="pw" type="password" placeholder="パスワードを入力">
@@ -77,6 +77,39 @@ async function loginTo(nextPage){
   } else {
     document.getElementById("err").style.display = "block";
   }
+}
+
+
+/* =========================
+   アクセスカウンター（index専用）
+   Firebase不要 / 登録不要
+========================= */
+
+const NAMESPACE = "nedu2026-f5-si"; // サイト識別子（自由）
+const KEY = "index-access";        // index.html 専用
+
+// 🔹 リロード連打防止（1タブ1回）
+if (!sessionStorage.getItem("counted")) {
+  fetch(`https://api.countapi.xyz/hit/${NAMESPACE}/${KEY}`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("counter").textContent =
+        `👨‍👩‍👧‍👦 このページを開いた人の数： ${data.value} 回`;
+    })
+    .catch(() => {
+      document.getElementById("counter").textContent =
+        "👀 アクセス数を取得できませんでした";
+    });
+
+  sessionStorage.setItem("counted", "1");
+} else {
+  // すでにカウント済みでも表示だけは取得
+  fetch(`https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("counter").textContent =
+        `👨‍👩‍👧‍👦 このページを開いた人の数： ${data.value}回`;
+    });
 }
 </script>
 
