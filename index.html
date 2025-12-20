@@ -99,6 +99,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
+
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
@@ -111,6 +112,40 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+//^-^--------------------------------------------------------------------------------
+// ✅ 公開設定チェック
+const cfgRef = doc(db, "stats", "config");
+
+try {
+  const cfgSnap = await getDoc(cfgRef);
+  if (cfgSnap.exists() && cfgSnap.data().publish === false) {
+    document.body.innerHTML = `
+      <div style="
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        height:100vh;
+        background:#0e0e10;
+        color:white;
+        font-family:system-ui;
+        text-align:center;
+      ">
+        <div>
+          <h2>現在このサイトは非公開です</h2>
+          <p style="opacity:.7">公開までしばらくお待ちください</p>
+        </div>
+      </div>
+    `;
+    throw new Error("SITE_CLOSED");
+  }
+} catch (e) {
+  if (e.message !== "SITE_CLOSED") {
+    console.warn("config read failed", e);
+  }
+}
+
+//--------------------------------------------------------------------------------^=^
 
 // 匿名ID
 let anonId = localStorage.getItem("anon_id");

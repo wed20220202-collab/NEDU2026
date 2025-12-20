@@ -69,6 +69,12 @@ th{opacity:.8}
 
 <h3 id="count">総アクセス数：-</h3>
 
+<select id="publishSelect">
+  <option value="true">公開</option>
+  <option value="false">非公開</option>
+</select>
+<button id="savePublish">保存</button>
+
 <button id="csv">📤 CSV ダウンロード</button>
 
 <h3>📊 日別アクセス</h3>
@@ -104,7 +110,8 @@ import {
   getDocs,
   query,
   orderBy,
-  limit
+  limit,
+  setDoc
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
 /* 🔧 Firebase 設定（index.html と同じ） */
@@ -150,6 +157,14 @@ logoutBtn.onclick = async () => {
 
 /* 認証状態 */
 onAuthStateChanged(auth, async (u)=>{
+
+  // 公開設定 読み込み
+  const cfgRef = doc(db, "stats", "config");
+  const cfgSnap = await getDoc(cfgRef);
+
+  document.getElementById("publishSelect").value =
+    cfgSnap.exists() ? String(cfgSnap.data().publish) : "true";
+
   rowsEl.innerHTML="";
   calEl.innerHTML="";
   if(!u){
@@ -229,7 +244,6 @@ function setupCSV(logs){
       r.anonId ?? "",
       r.page ?? "",
       r.to ?? "",
-      r.referrer ?? "",
       (r.userAgent ?? "").replace(/"/g,'""')
     ]);
     const csv = [head, ...rows]
@@ -244,7 +258,19 @@ function setupCSV(logs){
     URL.revokeObjectURL(url);
   };
 }
-</script>
+// 公開設定 保存
+document.getElementById("savePublish").onclick = async () => {
+  const v = document.getElementById("publishSelect").value === "true";
 
+  await setDoc(
+    doc(db, "stats", "config"),
+    { publish: v, updatedAt: new Date() },
+    { merge: true }
+  );
+
+  alert("公開設定を保存しました");
+};
+
+</script>
 </body>
 </html>
