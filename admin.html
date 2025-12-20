@@ -157,16 +157,10 @@ logoutBtn.onclick = async () => {
 
 /* 認証状態 */
 onAuthStateChanged(auth, async (u)=>{
-  if (!u) return;
-
-  const cfgRef = doc(db, "stats", "config");
-  const cfgSnap = await getDoc(cfgRef);
-
-  publishSelect.value =
-    cfgSnap.exists() ? String(cfgSnap.data().publish) : "true";
-
   rowsEl.innerHTML="";
   calEl.innerHTML="";
+
+  // 🔐 未ログイン
   if(!u){
     statusEl.textContent="未ログイン";
     loginBtn.style.display="";
@@ -175,16 +169,22 @@ onAuthStateChanged(auth, async (u)=>{
     return;
   }
 
+  // 🔓 ログイン済み
   statusEl.textContent=`ログイン中：${u.email}`;
   loginBtn.style.display="none";
   logoutBtn.style.display="";
-  
-  /* 総カウンタ */
-  const c = await getDoc(doc(db,"stats","access"));
-  const total = c.exists() ? (c.data().count ?? 0) : 0;
-  countEl.textContent = "総アクセス数：" + total;
 
-  /* logs 読み込み */
+  // ✅ 公開設定（ここで読む）
+  const cfgSnap = await getDoc(doc(db,"stats","config"));
+  publishSelect.value =
+    cfgSnap.exists() ? String(cfgSnap.data().publish) : "true";
+
+  // ✅ 総アクセス数
+  const c = await getDoc(doc(db,"stats","access"));
+  countEl.textContent =
+    "総アクセス数：" + (c.exists()?c.data().count:0);
+
+  // ✅ logs
   const q = query(
     collection(db,"access_logs"),
     orderBy("time","desc"),
@@ -192,8 +192,8 @@ onAuthStateChanged(auth, async (u)=>{
   );
   const snap = await getDocs(q);
 
-  const logs = [];
-  snap.forEach(d => logs.push(d.data()));
+  const logs=[];
+  snap.forEach(d=>logs.push(d.data()));
 
   renderTable(logs);
   renderCalendar(logs);
