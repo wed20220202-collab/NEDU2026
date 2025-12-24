@@ -2,46 +2,26 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Menu</title>
+<title>メニュー</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{
-  margin:0; height:100vh;
-  display:flex; justify-content:center; align-items:center;
-  background:#0e0e10; color:#fff; font-family:system-ui;
-}
-.card{
-  width:360px; padding:40px;
-  background:#1e1e20; border-radius:16px;
-  text-align:center;
-}
-button{
-  width:100%; padding:12px;
-  margin-top:12px;
-  border:none; border-radius:8px;
-  background:#4e7fff; color:#fff;
-  font-weight:600; cursor:pointer;
-}
-.secondary{background:#444}
+body{background:#0e0e10;color:#fff;font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{background:#1e1e20;padding:30px;border-radius:14px;width:320px;text-align:center}
+button{width:100%;padding:12px;border:none;border-radius:8px;margin-top:10px;font-weight:600}
+.video{background:#4e7fff;color:#fff}
+.image{background:#444;color:#fff}
 </style>
 </head>
-
 <body>
 <div class="card">
   <h2>メニュー</h2>
-  <button onclick="go('movie.html')">🎬 動画を開く</button>
-  <button class="secondary" onclick="go('viewer.html')">🖼 画像ビューア</button>
+  <button class="video" onclick="go('movie.html')">🎬 動画を見る</button>
+  <button class="image" onclick="go('viewer.html')">🖼 画像を見る</button>
 </div>
 
 <script>
-if(sessionStorage.getItem("loginOK")!=="1"){
-  location.replace("index.html");
-}
-
-function go(to){
-  sessionStorage.setItem("next",to);
-  location.href = to;
-}
+if(!sessionStorage.getItem("login")) location.href="index.html";
+function go(to){ location.href=to; }
 </script>
 </body>
 </html>
