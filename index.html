@@ -1,209 +1,178 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>🌸動画サイト🌸</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="/favicon.ico?v=2">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta charset="UTF-8">
+<title>🌸動画サイト🌸</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-  body{margin:0;padding:0;background:#0e0e10;font-family:"Segoe UI",sans-serif;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh}
-  .card{background:rgba(30,30,32,.85);padding:40px 35px;border-radius:16px;box-shadow:0 0 25px rgba(0,0,0,.6);width:360px;text-align:center;backdrop-filter:blur(6px);animation:fadeIn .7s ease}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-  button{width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4e7fff,#335dff);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:.25s}
-  button:hover{opacity:.85;transform:scale(1.02)}
-  .secondary{margin-top:10px;background:#444}
-  .error{color:#ff7474;margin-top:12px;font-size:14px;display:none}
-  input[type="password"]{width:100%;padding:12px;border:2px solid #4e7fff;border-radius:8px;background:#1d1d20;color:#fff;outline:none;margin-bottom:16px;font-size:15px;transition:.3s}
-  input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
-  .small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
-  .red{color: #f00;}
-  </style>
+<style>
+body{
+  margin:0;
+  background:#0e0e10;
+  font-family:"Segoe UI",sans-serif;
+  color:#fff;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+.card{
+  background:rgba(30,30,32,.85);
+  padding:40px 35px;
+  border-radius:16px;
+  box-shadow:0 0 25px rgba(0,0,0,.6);
+  width:360px;
+  text-align:center;
+}
+button{
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:8px;
+  background:linear-gradient(135deg,#4e7fff,#335dff);
+  color:#fff;
+  font-size:16px;
+  font-weight:600;
+  cursor:pointer;
+  margin-top:10px;
+}
+button.secondary{background:#444}
+input{
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:2px solid #4e7fff;
+  background:#1d1d20;
+  color:#fff;
+  margin-bottom:10px;
+}
+.small{opacity:.75;font-size:12px;margin-top:10px}
+.error{color:#ff7474;display:none}
+</style>
 </head>
 
-<body oncontextmenu="return false">
-<div class="card">
-  <h2>login画面</h2>
+<body>
 
+<div class="card">
+
+  <h2 id="title">login画面</h2>
   <div id="counter" class="small">👀 読み込み中…</div>
 
-  <input id="pw" type="password" placeholder="パスワードを入力">
-
-  <!-- ✅ data-to に遷移先を持たせる（これが一番確実） -->
-  <button data-to="movie.html" onclick="loginToFromBtn(this)">動画を開く</button>
-  <button class="secondary" data-to="viewer.html" onclick="loginToFromBtn(this)">画像ビューアを開く</button>
-
-  <div id="err" class="error">パスワードが違います</div>
-  <div class="small">
-    <div class="red">
-      ※6年生の担任の名前を1組2組つなげて入力してね！
-    </div>入力する文字はヘボン式でお願いします<br><br>
-    ※ログイン状態はタブを閉じると消えます<br>
-    ※一定時間で自動ログアウトします
+  <!-- 🔐 ログインエリア -->
+  <div id="loginArea">
+    <input id="pw" type="password" placeholder="パスワードを入力">
+    <button onclick="login()">ログイン</button>
+    <div id="err" class="error">パスワードが違います</div>
+    <div class="small">
+      ※6年生の担任の名前を1組2組つなげて入力<br>
+      ※ヘボン式
+    </div>
   </div>
+
+  <!-- 🔓 ログイン後エリア -->
+  <div id="menuArea" style="display:none">
+    <button onclick="go('movie.html')">🎬 動画を開く</button>
+    <button class="secondary" onclick="go('viewer.html')">🖼 画像ビューアを開く</button>
+    <div class="small">※タブを閉じるとログアウトします</div>
+  </div>
+
 </div>
 
 <script>
-/* =========================
-   設定（ログイン）
-========================= */
-const PASSWORD_HASH = "281e62e280f2a9afd1444376c9d86ce60c7463169cda41206eb7990f2a1882fd";
+/* ===== ログイン設定 ===== */
+const PASSWORD_HASH =
+  "281e62e280f2a9afd1444376c9d86ce60c7463169cda41206eb7990f2a1882fd";
 const SESSION_TTL_MS = 20 * 60 * 1000;
-
-// ✅ Firebase準備前でも壊れないダミー
-window.logAfterLogin = async function(_to){};
 
 async function sha256(text){
   const data = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
-async function loginToFromBtn(btn){
-  const to = btn?.dataset?.to || "movie.html"; // ここで確実に決まる
-  await loginTo(to);
-}
-
-async function loginTo(to){
-  const input = document.getElementById("pw").value.trim();
-  const inputHash = await sha256(input);
-
-  if (inputHash === PASSWORD_HASH) {
-    try {
-      await window.logAfterLogin(to); // ✅ ここで「押したボタンの to」を渡す
-    } catch (e) {
-      console.warn("logAfterLogin failed:", e);
-    }
-
-    sessionStorage.setItem("loginOK", "1");
-    sessionStorage.setItem("sid", Date.now() + "_" + Math.random().toString(36).slice(2));
-    sessionStorage.setItem("loginAt", String(Date.now()));
-    sessionStorage.setItem("ttl", String(SESSION_TTL_MS));
-
-    location.replace(to);
-  } else {
-    document.getElementById("err").style.display = "block";
+async function login(){
+  const pw = document.getElementById("pw").value.trim();
+  const hash = await sha256(pw);
+  if(hash !== PASSWORD_HASH){
+    document.getElementById("err").style.display="block";
+    return;
   }
+
+  sessionStorage.setItem("loginOK","1");
+  sessionStorage.setItem("loginAt",Date.now());
+  showMenu();
+}
+
+function showMenu(){
+  document.getElementById("loginArea").style.display="none";
+  document.getElementById("menuArea").style.display="block";
+  document.getElementById("title").textContent="メニュー";
+}
+
+function go(to){
+  logAfterLogin(to);
+  location.href = to;
+}
+
+if(sessionStorage.getItem("loginOK")==="1"){
+  showMenu();
 }
 </script>
 
-<!-- =========================
-     Firebase / Firestore（アクセスカウンタ＋ログ）
-========================= -->
+<!-- ===== Firebase ===== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import {
-  getFirestore,
-  doc,
-  runTransaction,
-  getDoc,
-  collection,
-  addDoc,
-  serverTimestamp
+  getFirestore, doc, getDoc, runTransaction,
+  collection, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-
 
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
-  projectId: "endlees-accescounter",
-  storageBucket: "endlees-accescounter.firebasestorage.app",
-  messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
-  measurementId: "G-T2XD6N46Z8"
+  projectId: "endlees-accescounter"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-//^-^--------------------------------------------------------------------------------
-// ✅ 公開設定チェック
-const cfgRef = doc(db, "stats", "config");
-
-try {
-  const cfgSnap = await getDoc(cfgRef);
-  if (cfgSnap.exists() && cfgSnap.data().publish === false) {
-    document.body.innerHTML = `
-      <div style="
-        display:flex;
-        justify-content:center;
-        align-items:center;
-        height:100vh;
-        background:#0e0e10;
-        color:white;
-        font-family:system-ui;
-        text-align:center;
-      ">
-        <div>
-          <h2>現在このサイトは非公開です</h2>
-          <p style="opacity:.7">公開までしばらくお待ちください</p>
-        </div>
-      </div>
-    `;
-    throw new Error("SITE_CLOSED");
-  }
-} catch (e) {
-  if (e.message !== "SITE_CLOSED") {
-    console.warn("config read failed", e);
-  }
+/* 公開設定チェック */
+const cfgSnap = await getDoc(doc(db,"stats","config"));
+if(cfgSnap.exists() && cfgSnap.data().publish === false){
+  document.body.innerHTML = "<h2>現在このサイトは非公開です</h2>";
+  throw new Error("closed");
 }
 
-//--------------------------------------------------------------------------------^=^
-
-// 匿名ID
-let anonId = localStorage.getItem("anon_id");
-if (!anonId) {
-  anonId = "anon_" + crypto.randomUUID();
-  localStorage.setItem("anon_id", anonId);
-}
-
-// ✅ カウンター：stats/access の count を増やす（1タブ1回）
+/* アクセスカウンタ */
 const counterEl = document.getElementById("counter");
-const counterRef = doc(db, "stats", "access");
+const counterRef = doc(db,"stats","access");
 
-async function bumpCounterOncePerTab() {
-  if (!sessionStorage.getItem("counted_index")) {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      const cur = snap.exists() && typeof snap.data().count === "number" ? snap.data().count : 0;
-      tx.set(counterRef, { count: cur + 1, updatedAt: serverTimestamp() }, { merge: true });
-    });
-    sessionStorage.setItem("counted_index", "1");
-  }
-  const s = await getDoc(counterRef);
-  const val = s.exists() ? (s.data().count ?? 0) : 0;
-  counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${val} 回`;
+if(!sessionStorage.getItem("counted")){
+  await runTransaction(db, async(tx)=>{
+    const s = await tx.get(counterRef);
+    const c = s.exists()?s.data().count:0;
+    tx.set(counterRef,{count:c+1},{merge:true});
+  });
+  sessionStorage.setItem("counted","1");
 }
+const s = await getDoc(counterRef);
+counterEl.textContent = `👨‍👩‍👧‍👦 このページを開いた回数： ${s.data().count} 回`;
 
-// ✅ ログイン成功ログ（押したボタンの遷移先 to をそのまま保存）
-window.logAfterLogin = async function(to) {
-  const base = {
+/* ログ */
+let anonId = localStorage.getItem("anon_id");
+if(!anonId){
+  anonId="anon_"+crypto.randomUUID();
+  localStorage.setItem("anon_id",anonId);
+}
+window.logAfterLogin = async (to)=>{
+  await addDoc(collection(db,"access_logs"),{
     anonId,
-    page: "index",
-    to, // ✅ ここが確実に viewer.html / movie.html になる
-    time: serverTimestamp(),
-    referrer: document.referrer || "direct",
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    screen: { w: screen.width, h: screen.height },
-  };
-
-  if (navigator.getBattery) {
-    try {
-      const bat = await navigator.getBattery();
-      base.battery = { level: bat.level, charging: bat.charging };
-    } catch {}
-  }
-
-  await addDoc(collection(db, "access_logs"), base);
+    page:"index",
+    to,
+    time:serverTimestamp(),
+    userAgent:navigator.userAgent
+  });
 };
-
-bumpCounterOncePerTab().catch(err => {
-  console.warn(err);
-  counterEl.textContent = "👀 カウンタ取得に失敗しました";
-});
 </script>
 
 </body>
