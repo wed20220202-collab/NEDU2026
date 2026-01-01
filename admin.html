@@ -210,6 +210,24 @@ function renderTable(logs){
   });
 }
 
+/* 日別カレンダー */
+function renderCalendar(logs){
+  const map = {};
+  logs.forEach(r=>{
+    if(!r.time?.toDate) return;
+    const d = r.time.toDate();
+    const key = d.toISOString().slice(0,10);
+    map[key] = (map[key]||0)+1;
+  });
+
+  Object.keys(map).sort().reverse().forEach(k=>{
+    const div=document.createElement("div");
+    div.className="day";
+    div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
+    calEl.appendChild(div);
+  });
+}
+
 /* CSV（主要項目） */
 function setupCSV(logs){
   csvBtn.onclick = ()=>{
