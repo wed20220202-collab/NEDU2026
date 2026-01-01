@@ -52,6 +52,21 @@ pre{
   word-break:break-all;
   font-size:11px;
 }
+.calendar{
+  display:grid;
+  grid-template-columns: repeat(7,1fr);
+  gap:6px;
+  margin:10px 0 20px;
+}
+.day{
+  border:1px solid #333;
+  border-radius:6px;
+  padding:6px;
+  font-size:11px;
+  min-height:46px;
+}
+.day strong{display:block;font-size:12px}
+.day span{opacity:.7}
 </style>
 </head>
 
@@ -68,6 +83,9 @@ pre{
 <h3 id="count">総アクセス数：-</h3>
 
 <button id="csv">📤 CSV ダウンロード</button>
+
+<h3>📊 日別アクセス（日本時間）</h3>
+<div id="calendar" class="calendar"></div>
 
 <h3>📋 アクセスログ（最新200件）</h3>
 <table>
@@ -175,6 +193,7 @@ onAuthStateChanged(auth, async user=>{
   snap.forEach(d=>logs.push(d.data()));
 
   renderTable(logs);
+  renderCalendar(logs);
   setupCSV(logs);
 });
 
@@ -212,21 +231,38 @@ function renderTable(logs){
 
 /* 日別カレンダー */
 function renderCalendar(logs){
+  calEl.innerHTML = "";
+
   const map = {};
+
   logs.forEach(r=>{
     if(!r.time?.toDate) return;
+
     const d = r.time.toDate();
-    const key = d.toISOString().slice(0,10);
-    map[key] = (map[key]||0)+1;
+
+    // ✅ 日本時間で YYYY-MM-DD を生成
+    const key = d.toLocaleDateString("sv-SE", {
+      timeZone: "Asia/Tokyo"
+    });
+
+    map[key] = (map[key] || 0) + 1;
   });
 
-  Object.keys(map).sort().reverse().forEach(k=>{
-    const div=document.createElement("div");
-    div.className="day";
-    div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
-    calEl.appendChild(div);
-  });
+  // 新しい日付を上に
+  Object.keys(map)
+    .sort()
+    .reverse()
+    .forEach(date=>{
+      const div = document.createElement("div");
+      div.className = "day";
+      div.innerHTML = `
+        <strong>${date}</strong>
+        <span>${map[date]} 件</span>
+      `;
+      calEl.appendChild(div);
+    });
 }
+
 
 /* CSV（主要項目） */
 function setupCSV(logs){
