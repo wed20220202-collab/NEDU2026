@@ -26,6 +26,14 @@ button:hover{opacity:.9}
 #logout{background:#444;margin-left:8px}
 .small{opacity:.7;font-size:12px}
 
+input{
+  padding:6px;
+  border-radius:6px;
+  border:1px solid #333;
+  background:#000;
+  color:#fff;
+}
+
 table{
   width:100%;
   border-collapse:collapse;
@@ -52,6 +60,7 @@ pre{
   word-break:break-all;
   font-size:11px;
 }
+
 .calendar{
   display:grid;
   grid-template-columns: repeat(7,1fr);
@@ -67,6 +76,7 @@ pre{
 }
 .day strong{display:block;font-size:12px}
 .day span{opacity:.7}
+.day.today{border-color:#335dff}
 </style>
 </head>
 
@@ -81,8 +91,14 @@ pre{
 <hr>
 
 <h3 id="count">総アクセス数：-</h3>
-
 <button id="csv">📤 CSV ダウンロード</button>
+
+<h3>🔍 フィルター</h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+  <input id="f-text" placeholder="キーワード（UA / referrer / anonId など）" style="flex:1;min-width:220px">
+  <input id="f-date" type="date">
+  <button id="f-clear">解除</button>
+</div>
 
 <h3>📊 日別アクセス（日本時間）</h3>
 <div id="calendar" class="calendar"></div>
@@ -128,8 +144,7 @@ const firebaseConfig = {
   projectId: "endlees-accescounter",
   storageBucket: "endlees-accescounter.firebasestorage.app",
   messagingSenderId: "70250476146",
-  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb",
-  measurementId: "G-T2XD6N46Z8"
+  appId: "1:70250476146:web:cc95f3b7036fbbbc6408eb"
 };
 
 const app  = initializeApp(firebaseConfig);
@@ -145,8 +160,15 @@ const rowsEl   = document.getElementById("rows");
 const csvBtn   = document.getElementById("csv");
 const calEl    = document.getElementById("calendar");
 
+const fText  = document.getElementById("f-text");
+const fDate  = document.getElementById("f-date");
+const fClear = document.getElementById("f-clear");
+
+/* ログ保持 */
+let allLogs = [];
+
 /* ログイン */
-loginBtn.onclick = async () => {
+loginBtn.onclick = async ()=>{
   const email = prompt("管理者メール");
   const pass  = prompt("管理者パスワード");
   if(!email || !pass) return;
@@ -158,31 +180,30 @@ loginBtn.onclick = async () => {
 };
 
 /* ログアウト */
-logoutBtn.onclick = async () => {
+logoutBtn.onclick = async ()=>{
   await signOut(auth);
 };
 
-/* 認証状態 */
+/* 認証 */
 onAuthStateChanged(auth, async user=>{
-  rowsEl.innerHTML = "";
+  rowsEl.innerHTML="";
+  calEl.innerHTML="";
+
   if(!user){
-    statusEl.textContent = "未ログイン";
-    loginBtn.style.display = "";
-    logoutBtn.style.display = "none";
-    countEl.textContent = "総アクセス数：-";
+    statusEl.textContent="未ログイン";
+    loginBtn.style.display="";
+    logoutBtn.style.display="none";
+    countEl.textContent="総アクセス数：-";
     return;
   }
 
-  statusEl.textContent = `ログイン中：${user.email}`;
-  loginBtn.style.display = "none";
-  logoutBtn.style.display = "";
+  statusEl.textContent=`ログイン中：${user.email}`;
+  loginBtn.style.display="none";
+  logoutBtn.style.display="";
 
-  /* 総アクセス数 */
   const stat = await getDoc(doc(db,"stats","access"));
-  const total = stat.exists() ? stat.data().count ?? 0 : 0;
-  countEl.textContent = "総アクセス数：" + total;
+  countEl.textContent="総アクセス数：" + (stat.data()?.count ?? 0);
 
-  /* ログ取得 */
   const q = query(
     collection(db,"access_logs"),
     orderBy("time","desc"),
@@ -190,104 +211,99 @@ onAuthStateChanged(auth, async user=>{
   );
   const snap = await getDocs(q);
 
-  const logs = [];
-  snap.forEach(d=>logs.push(d.data()));
+  allLogs = [];
+  snap.forEach(d=>allLogs.push(d.data()));
 
-  renderTable(logs);
-  renderCalendar(logs);
-  setupCSV(logs);
+  applyFilter();
+  renderCalendar(allLogs);
+  setupCSV();
 });
 
-/* テーブル描画（全フィールド対応） */
+/* フィルター */
+function applyFilter(){
+  let logs = [...allLogs];
+
+  const q = fText.value.trim().toLowerCase();
+  if(q){
+    logs = logs.filter(r =>
+      [r.anonId,r.page,r.to,r.referrer,r.userAgent]
+        .some(v => (v??"").toLowerCase().includes(q))
+    );
+  }
+
+  if(fDate.value){
+    logs = logs.filter(r=>{
+      if(!r.time?.toDate) return false;
+      const key = r.time.toDate().toLocaleDateString("sv-SE",{timeZone:"Asia/Tokyo"});
+      return key === fDate.value;
+    });
+  }
+
+  renderTable(logs);
+}
+
+fText.oninput = applyFilter;
+fDate.onchange = applyFilter;
+fClear.onclick = ()=>{
+  fText.value="";
+  fDate.value="";
+  renderTable(allLogs);
+};
+
+/* テーブル */
 function renderTable(logs){
-  rowsEl.innerHTML = "";
-
+  rowsEl.innerHTML="";
   logs.forEach(r=>{
+    const t = r.time?.toDate?.().toLocaleString() ?? "";
     const tr = document.createElement("tr");
-    const t  = r.time?.toDate?.().toLocaleString() ?? "";
-
-    const all = {
-      ...r,
-      time: t
-    };
-
     tr.innerHTML = `
       <td>${t}</td>
-      <td>${r.anonId ?? ""}</td>
-      <td>${r.page ?? ""} → ${r.to ?? ""}</td>
-      <td>${(r.referrer ?? "").slice(0,40)}</td>
-      <td style="word-break:break-all">
-        ${(r.userAgent ?? "").slice(0,80)}
-      </td>
+      <td>${r.anonId??""}</td>
+      <td>${r.page??""} → ${r.to??""}</td>
+      <td>${(r.referrer??"").slice(0,40)}</td>
+      <td style="word-break:break-all">${(r.userAgent??"").slice(0,80)}</td>
       <td>
         <details>
           <summary class="small">表示</summary>
-          <pre>${JSON.stringify(all,null,2)}</pre>
+          <pre>${JSON.stringify({...r,time:t},null,2)}</pre>
         </details>
-      </td>
-    `;
+      </td>`;
     rowsEl.appendChild(tr);
   });
 }
 
-/* 日別カレンダー */
+/* カレンダー */
 function renderCalendar(logs){
-  calEl.innerHTML = "";
-
-  const map = {};
-
+  calEl.innerHTML="";
+  const map={};
   logs.forEach(r=>{
     if(!r.time?.toDate) return;
-
-    const d = r.time.toDate();
-
-    // ✅ 日本時間で YYYY-MM-DD を生成
-    const key = d.toLocaleDateString("sv-SE", {
-      timeZone: "Asia/Tokyo"
-    });
-
-    map[key] = (map[key] || 0) + 1;
+    const key = r.time.toDate().toLocaleDateString("sv-SE",{timeZone:"Asia/Tokyo"});
+    map[key]=(map[key]||0)+1;
   });
 
-  // 新しい日付を上に
-  Object.keys(map)
-    .sort()
-    .reverse()
-    .forEach(date=>{
-      const div = document.createElement("div");
-      div.className = "day";
-      div.innerHTML = `
-        <strong>${date}</strong>
-        <span>${map[date]} 件</span>
-      `;
-      calEl.appendChild(div);
-    });
+  const today = new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Tokyo"});
+  Object.keys(map).sort().reverse().forEach(d=>{
+    const div=document.createElement("div");
+    div.className="day"+(d===today?" today":"");
+    div.innerHTML=`<strong>${d}</strong><span>${map[d]} 件</span>`;
+    div.onclick=()=>{fDate.value=d;applyFilter();}
+    calEl.appendChild(div);
+  });
 }
 
-
-/* CSV（主要項目） */
-function setupCSV(logs){
-  csvBtn.onclick = ()=>{
-    const head = ["time","anonId","page","to","referrer","userAgent"];
-    const rows = logs.map(r=>[
-      r.time?.toDate?.().toISOString() ?? "",
-      r.anonId ?? "",
-      r.page ?? "",
-      r.to ?? "",
-      r.referrer ?? "",
-      (r.userAgent ?? "").replace(/"/g,'""')
-    ]);
-
-    const csv = [head,...rows]
-      .map(r=>`"${r.join('","')}"`).join("\n");
-
-    const blob = new Blob([csv],{type:"text/csv"});
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url;
-    a.download = "access_logs.csv";
+/* CSV（表示中のみ） */
+function setupCSV(){
+  csvBtn.onclick=()=>{
+    const rows=[...rowsEl.querySelectorAll("tr")]
+      .map(tr=>[...tr.children].slice(0,5).map(td=>td.innerText));
+    const head=["time","anonId","page→to","referrer","userAgent"];
+    const csv=[head,...rows].map(r=>`"${r.join('","')}"`).join("\n");
+    const blob=new Blob([csv],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="access_logs_filtered.csv";
     a.click();
-    URL.revokeObjectURL(url);
   };
 }
 </script>
