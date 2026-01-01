@@ -194,6 +194,7 @@ function renderTable(logs){
     tr.innerHTML=`
       <td>${t}</td>
       <td>${r.anonId ?? ""}</td>
+      <td>${r.battery/charging ?? ""}</td>
       <td>${r.page ?? ""} → ${r.to ?? ""}</td>
       <td>${(r.referrer ?? "").slice(0,40)}</td>
       <td style="word-break:break-all">${(r.userAgent ?? "").slice(0,120)}</td>
@@ -203,7 +204,7 @@ function renderTable(logs){
 }
 
 /* 日別カレンダー */
-function renderCalendar(logs){
+/*function renderCalendar(logs){
   const map = {};
   logs.forEach(r=>{
     if(!r.time?.toDate) return;
@@ -218,7 +219,7 @@ function renderCalendar(logs){
     div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
     calEl.appendChild(div);
   });
-}
+}*/
 
 /* CSV */
 function setupCSV(logs){
