@@ -12,7 +12,7 @@ body{
   color:#fff;
   padding:20px;
 }
-h2{margin-top:0}
+h2,h3{margin-top:0}
 button{
   padding:8px 14px;
   border:0;
@@ -39,21 +39,19 @@ th,td{
 }
 th{opacity:.8}
 
-.calendar{
-  display:grid;
-  grid-template-columns: repeat(7,1fr);
-  gap:6px;
-  margin:10px 0 20px;
+details summary{
+  cursor:pointer;
+  color:#8ab4ff;
 }
-.day{
-  border:1px solid #333;
+pre{
+  background:#000;
+  padding:8px;
   border-radius:6px;
-  padding:6px;
+  margin:6px 0 0;
+  white-space:pre-wrap;
+  word-break:break-all;
   font-size:11px;
-  min-height:46px;
 }
-.day strong{display:block;font-size:12px}
-.day span{opacity:.7}
 </style>
 </head>
 
@@ -71,9 +69,6 @@ th{opacity:.8}
 
 <button id="csv">📤 CSV ダウンロード</button>
 
-<h3>📊 日別アクセス</h3>
-<div id="calendar" class="calendar"></div>
-
 <h3>📋 アクセスログ（最新200件）</h3>
 <table>
 <thead>
@@ -83,6 +78,7 @@ th{opacity:.8}
   <th>page → to</th>
   <th>referrer</th>
   <th>UserAgent</th>
+  <th>detail</th>
 </tr>
 </thead>
 <tbody id="rows"></tbody>
@@ -107,7 +103,7 @@ import {
   limit
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-/* 🔧 Firebase 設定（index.html と同じ） */
+/* Firebase 設定 */
 const firebaseConfig = {
   apiKey: "AIzaSyBBpOKnLNBz0qikWgl6zAGpRG8_o0LZEEc",
   authDomain: "endlees-accescounter.firebaseapp.com",
@@ -118,18 +114,17 @@ const firebaseConfig = {
   measurementId: "G-T2XD6N46Z8"
 };
 
-const app = initializeApp(firebaseConfig);
+const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db   = getFirestore(app);
 
 /* UI */
 const statusEl = document.getElementById("status");
-const loginBtn  = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
-const countEl   = document.getElementById("count");
-const rowsEl    = document.getElementById("rows");
-const calEl     = document.getElementById("calendar");
-const csvBtn    = document.getElementById("csv");
+const loginBtn = document.getElementById("login");
+const logoutBtn= document.getElementById("logout");
+const countEl  = document.getElementById("count");
+const rowsEl   = document.getElementById("rows");
+const csvBtn   = document.getElementById("csv");
 
 /* ログイン */
 loginBtn.onclick = async () => {
@@ -137,8 +132,8 @@ loginBtn.onclick = async () => {
   const pass  = prompt("管理者パスワード");
   if(!email || !pass) return;
   try{
-    await signInWithEmailAndPassword(auth, email, pass);
-  }catch(e){
+    await signInWithEmailAndPassword(auth,email,pass);
+  }catch{
     alert("ログイン失敗");
   }
 };
@@ -149,27 +144,26 @@ logoutBtn.onclick = async () => {
 };
 
 /* 認証状態 */
-onAuthStateChanged(auth, async (u)=>{
-  rowsEl.innerHTML="";
-  calEl.innerHTML="";
-  if(!u){
-    statusEl.textContent="未ログイン";
-    loginBtn.style.display="";
-    logoutBtn.style.display="none";
-    countEl.textContent="総アクセス数：-";
+onAuthStateChanged(auth, async user=>{
+  rowsEl.innerHTML = "";
+  if(!user){
+    statusEl.textContent = "未ログイン";
+    loginBtn.style.display = "";
+    logoutBtn.style.display = "none";
+    countEl.textContent = "総アクセス数：-";
     return;
   }
 
-  statusEl.textContent=`ログイン中：${u.email}`;
-  loginBtn.style.display="none";
-  logoutBtn.style.display="";
-  
-  /* 総カウンタ */
-  const c = await getDoc(doc(db,"stats","access"));
-  const total = c.exists() ? (c.data().count ?? 0) : 0;
+  statusEl.textContent = `ログイン中：${user.email}`;
+  loginBtn.style.display = "none";
+  logoutBtn.style.display = "";
+
+  /* 総アクセス数 */
+  const stat = await getDoc(doc(db,"stats","access"));
+  const total = stat.exists() ? stat.data().count ?? 0 : 0;
   countEl.textContent = "総アクセス数：" + total;
 
-  /* logs 読み込み */
+  /* ログ取得 */
   const q = query(
     collection(db,"access_logs"),
     orderBy("time","desc"),
@@ -178,73 +172,70 @@ onAuthStateChanged(auth, async (u)=>{
   const snap = await getDocs(q);
 
   const logs = [];
-  snap.forEach(d => logs.push(d.data()));
+  snap.forEach(d=>logs.push(d.data()));
 
   renderTable(logs);
-  renderCalendar(logs);
   setupCSV(logs);
 });
 
-/* テーブル描画 */
+/* テーブル描画（全フィールド対応） */
 function renderTable(logs){
-  rowsEl.innerHTML="";
+  rowsEl.innerHTML = "";
+
   logs.forEach(r=>{
-    const tr=document.createElement("tr");
-    const t = r.time?.toDate?.().toLocaleString() ?? "";
-    tr.innerHTML=`
+    const tr = document.createElement("tr");
+    const t  = r.time?.toDate?.().toLocaleString() ?? "";
+
+    const all = {
+      ...r,
+      time: t
+    };
+
+    tr.innerHTML = `
       <td>${t}</td>
       <td>${r.anonId ?? ""}</td>
-      <td>${r.battery/charging ?? ""}</td>
       <td>${r.page ?? ""} → ${r.to ?? ""}</td>
       <td>${(r.referrer ?? "").slice(0,40)}</td>
-      <td style="word-break:break-all">${(r.userAgent ?? "").slice(0,120)}</td>
+      <td style="word-break:break-all">
+        ${(r.userAgent ?? "").slice(0,80)}
+      </td>
+      <td>
+        <details>
+          <summary class="small">表示</summary>
+          <pre>${JSON.stringify(all,null,2)}</pre>
+        </details>
+      </td>
     `;
     rowsEl.appendChild(tr);
   });
 }
 
-/* 日別カレンダー */
-/*function renderCalendar(logs){
-  const map = {};
-  logs.forEach(r=>{
-    if(!r.time?.toDate) return;
-    const d = r.time.toDate();
-    const key = d.toISOString().slice(0,10);
-    map[key] = (map[key]||0)+1;
-  });
-
-  Object.keys(map).sort().reverse().forEach(k=>{
-    const div=document.createElement("div");
-    div.className="day";
-    div.innerHTML=`<strong>${k}</strong><span>${map[k]} 件</span>`;
-    calEl.appendChild(div);
-  });
-}*/
-
-/* CSV */
+/* CSV（主要項目） */
 function setupCSV(logs){
-  csvBtn.onclick = () => {
+  csvBtn.onclick = ()=>{
     const head = ["time","anonId","page","to","referrer","userAgent"];
-    const rows = logs.map(r => [
+    const rows = logs.map(r=>[
       r.time?.toDate?.().toISOString() ?? "",
       r.anonId ?? "",
       r.page ?? "",
       r.to ?? "",
+      r.referrer ?? "",
       (r.userAgent ?? "").replace(/"/g,'""')
     ]);
-    const csv = [head, ...rows]
+
+    const csv = [head,...rows]
       .map(r=>`"${r.join('","')}"`).join("\n");
 
     const blob = new Blob([csv],{type:"text/csv"});
-    const url = URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;
-    a.download="access_logs.csv";
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = "access_logs.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
 }
-
 </script>
+
 </body>
 </html>
