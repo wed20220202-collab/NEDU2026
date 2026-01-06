@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>💬 謝恩会チャット</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+/* ===== CSS（内部） ===== */
+body {
+  font-family: system-ui, sans-serif;
+  background: #111;
+  color: #fff;
+  padding: 20px;
+}
+
+h2 {
+  text-align: center;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  border-radius: 6px;
+  border: none;
+  font-size: 16px;
+}
+
+button {
+  background: #3a86ff;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+#messages {
+  height: 320px;
+  overflow-y: auto;
+  border: 1px solid #444;
+  padding: 10px;
+  margin: 15px 0;
+  background: #000;
+}
+
+.msg {
+  margin-bottom: 10px;
+}
+
+.name {
+  color: #4cc9f0;
+  font-weight: bold;
+}
+
+.time {
+  color: #888;
+  font-size: 12px;
+  margin-left: 6px;
+}
+</style>
+</head>
+<body>
+
+<h2>💬 謝恩会チャット</h2>
+
+<!-- ログイン画面 -->
+<div id="login">
+  <input id="nameInput" placeholder="ニックネーム">
+  <input id="passInput" type="password" placeholder="合言葉">
+  <button onclick="login()">入室</button>
+</div>
+
+<!-- チャット画面 -->
+<div id="chat" style="display:none;">
+  <div id="messages"></div>
+  <input id="messageInput" placeholder="メッセージを入力">
+  <button onclick="sendMessage()">送信</button>
+</div>
+
+<script type="module">
+/* ===== Firebase（module版） ===== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+/* Firebase設定 */
+const firebaseConfig = {
+  apiKey: "AIzaSyC6XIodJTU56zFgvkIy3EuK139WmGvW4c4",
+  authDomain: "thanks-chat-1f1af.firebaseapp.com",
+  projectId: "thanks-chat-1f1af",
+  storageBucket: "thanks-chat-1f1af.firebasestorage.app",
+  messagingSenderId: "619698104734",
+  appId: "1:619698104734:web:0432a04b6d35f6de794e8f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* ===== チャット処理 ===== */
+const ROOM_PASSWORD = "THANKS2026";
+let userName = "";
+
+/* 入室 */
+window.login = () => {
+  const name = nameInput.value.trim();
+  const pass = passInput.value;
+
+  if (!name) {
+    alert("ニックネームを入力してください");
+    return;
+  }
+  if (pass !== ROOM_PASSWORD) {
+    alert("合言葉が違います");
+    return;
+  }
+
+  userName = name;
+  login.style.display = "none";
+  chat.style.display = "block";
+
+  listenMessages();
+};
+
+/* 送信 */
+window.sendMessage = async () => {
+  const text = messageInput.value.trim();
+  if (!text) return;
+
+  await addDoc(collection(db, "messages"), {
+    name: userName,
+    text: text,
+    time: serverTimestamp()
+  });
+
+  messageInput.value = "";
+};
+
+/* 受信 */
+function listenMessages() {
+  const q = query(
+    collection(db, "messages"),
+    orderBy("time"),
+    limit(50)
+  );
+
+  onSnapshot(q, snapshot => {
+    messages.innerHTML = "";
+
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const t = d.time ? new Date(d.time.toDate()).toLocaleTimeString() : "";
+
+      messages.innerHTML += `
+        <div class="msg">
+          <span class="name">${d.name}</span>
+          <span class="time">${t}</span><br>
+          ${d.text}
+        </div>
+      `;
+    });
+
+    messages.scrollTop = messages.scrollHeight;
+  });
+}
+</script>
+
+</body>
+</html>
