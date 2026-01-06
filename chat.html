@@ -2,185 +2,196 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>💬 謝恩会チャット</title>
+<title>謝恩会チャット</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-/* ===== CSS（内部） ===== */
 body {
+  margin: 0;
   font-family: system-ui, sans-serif;
   background: #111;
   color: #fff;
+}
+
+#login, #chat {
+  display: none;
   padding: 20px;
 }
 
-h2 {
+#login {
+  display: block;
   text-align: center;
+  margin-top: 40vh;
 }
 
 input, button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 8px;
+  padding: 10px;
+  font-size: 16px;
   border-radius: 6px;
   border: none;
-  font-size: 16px;
 }
 
 button {
-  background: #3a86ff;
-  color: white;
+  background: #4caf50;
+  color: #fff;
   cursor: pointer;
 }
 
-button:hover {
-  opacity: 0.9;
-}
-
 #messages {
-  height: 320px;
+  height: 70vh;
   overflow-y: auto;
-  border: 1px solid #444;
-  padding: 10px;
-  margin: 15px 0;
-  background: #000;
+  padding-bottom: 10px;
 }
 
-.msg {
+.message {
+  background: #222;
+  padding: 10px;
   margin-bottom: 10px;
+  border-radius: 6px;
 }
 
 .name {
-  color: #4cc9f0;
-  font-weight: bold;
+  font-size: 12px;
+  color: #aaa;
 }
 
-.time {
-  color: #888;
-  font-size: 12px;
-  margin-left: 6px;
+img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+#inputArea {
+  display: flex;
+  gap: 5px;
+}
+
+#inputArea input[type="text"] {
+  flex: 1;
 }
 </style>
 </head>
+
 <body>
 
-<h2>💬 謝恩会チャット</h2>
-
-<!-- ログイン画面 -->
+<!-- ログイン -->
 <div id="login">
-  <input id="nameInput" placeholder="ニックネーム">
-  <input id="passInput" type="password" placeholder="合言葉">
+  <h2>謝恩会チャット</h2>
+  <input id="nameInput" placeholder="名前を入力"><br><br>
   <button onclick="login()">入室</button>
 </div>
 
-<!-- チャット画面 -->
-<div id="chat" style="display:none;">
+<!-- チャット -->
+<div id="chat">
   <div id="messages"></div>
-  <input id="messageInput" placeholder="メッセージを入力">
-  <button onclick="sendMessage()">送信</button>
+
+  <div id="inputArea">
+    <input type="file" id="imageInput" accept="image/*">
+    <input type="text" id="messageInput" placeholder="メッセージ">
+    <button onclick="sendMessage()">送信</button>
+  </div>
 </div>
 
+<!-- Firebase -->
 <script type="module">
-/* ===== Firebase（module版） ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  limit,
-  onSnapshot,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-/* Firebase設定 */
 const firebaseConfig = {
   apiKey: "AIzaSyC6XIodJTU56zFgvkIy3EuK139WmGvW4c4",
   authDomain: "thanks-chat-1f1af.firebaseapp.com",
   projectId: "thanks-chat-1f1af",
-  storageBucket: "thanks-chat-1f1af.firebasestorage.app",
-  messagingSenderId: "619698104734",
-  appId: "1:619698104734:web:0432a04b6d35f6de794e8f"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ===== チャット処理 ===== */
-const ROOM_PASSWORD = "THANKS2026";
 let userName = "";
 
-/* 入室 */
+/* ログイン */
 window.login = () => {
   const name = document.getElementById("nameInput").value.trim();
-  const pass = document.getElementById("passInput").value;
-
-  if (!name) {
-    alert("ニックネームを入力してください");
-    return;
-  }
-  if (pass !== ROOM_PASSWORD) {
-    alert("合言葉が違います");
-    return;
-  }
+  if (!name) return alert("名前を入力してください");
 
   userName = name;
-
-  // 👇 ここが重要
-  const loginDiv = document.getElementById("login");
-  const chatDiv  = document.getElementById("chat");
-
-  loginDiv.style.display = "none";
-  chatDiv.style.display  = "block";
-
-  listenMessages();
+  document.getElementById("login").style.display = "none";
+  document.getElementById("chat").style.display = "block";
 };
 
+/* 画像圧縮 */
+function compressImage(file, maxWidth = 800, quality = 0.6) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    const img = new Image();
+
+    reader.onload = e => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(maxWidth / img.width, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 /* 送信 */
 window.sendMessage = async () => {
-  const input = document.getElementById("messageInput");
-  const text = input.value.trim();
-  if (!text) return;
+  const textInput = document.getElementById("messageInput");
+  const imageInput = document.getElementById("imageInput");
+
+  const text = textInput.value.trim();
+  const file = imageInput.files[0];
+  if (!text && !file) return;
+
+  let image = "";
+  if (file) {
+    if (file.size > 3 * 1024 * 1024) {
+      alert("画像が大きすぎます");
+      return;
+    }
+    image = await compressImage(file);
+  }
 
   await addDoc(collection(db, "messages"), {
     name: userName,
-    text: text,
+    text,
+    image,
     time: serverTimestamp()
   });
 
-  input.value = "";
+  textInput.value = "";
+  imageInput.value = "";
 };
 
-
 /* 受信 */
-function listenMessages() {
-  const q = query(
-    collection(db, "messages"),
-    orderBy("time"),
-    limit(50)
-  );
+const q = query(collection(db, "messages"), orderBy("time"));
+onSnapshot(q, snapshot => {
+  const messages = document.getElementById("messages");
+  messages.innerHTML = "";
 
-  onSnapshot(q, snapshot => {
-    messages.innerHTML = "";
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    let html = `<div class="message">
+      <div class="name">${d.name}</div>
+      <div>${d.text || ""}</div>`;
 
-    snapshot.forEach(doc => {
-      const d = doc.data();
-      const t = d.time ? new Date(d.time.toDate()).toLocaleTimeString() : "";
+    if (d.image) {
+      html += `<img src="${d.image}">`;
+    }
 
-      messages.innerHTML += `
-        <div class="msg">
-          <span class="name">${d.name}</span>
-          <span class="time">${t}</span><br>
-          ${d.text}
-        </div>
-      `;
-    });
-
-    messages.scrollTop = messages.scrollHeight;
+    html += `</div>`;
+    messages.innerHTML += html;
   });
-}
+
+  messages.scrollTop = messages.scrollHeight;
+});
 </script>
 
 </body>
