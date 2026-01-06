@@ -113,8 +113,8 @@ let userName = "";
 
 /* 入室 */
 window.login = () => {
-  const name = nameInput.value.trim();
-  const pass = passInput.value;
+  const name = document.getElementById("nameInput").value.trim();
+  const pass = document.getElementById("passInput").value;
 
   if (!name) {
     alert("ニックネームを入力してください");
@@ -126,15 +126,22 @@ window.login = () => {
   }
 
   userName = name;
-  login.style.display = "none";
-  chat.style.display = "block";
+
+  // 👇 ここが重要
+  const loginDiv = document.getElementById("login");
+  const chatDiv  = document.getElementById("chat");
+
+  loginDiv.style.display = "none";
+  chatDiv.style.display  = "block";
 
   listenMessages();
 };
 
+
 /* 送信 */
 window.sendMessage = async () => {
-  const text = messageInput.value.trim();
+  const input = document.getElementById("messageInput");
+  const text = input.value.trim();
   if (!text) return;
 
   await addDoc(collection(db, "messages"), {
@@ -143,8 +150,9 @@ window.sendMessage = async () => {
     time: serverTimestamp()
   });
 
-  messageInput.value = "";
+  input.value = "";
 };
+
 
 /* 受信 */
 function listenMessages() {
