@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>写真投稿</title>
+
+<style>
+
+body{
+margin:0;
+font-family:sans-serif;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.card{
+width:90%;
+max-width:520px;
+background:rgba(255,255,255,.08);
+padding:25px;
+border-radius:16px;
+backdrop-filter:blur(10px);
+}
+
+input,textarea{
+width:100%;
+padding:10px;
+margin-bottom:10px;
+border:none;
+border-radius:8px;
+background:#1c1c22;
+color:white;
+}
+
+button{
+width:100%;
+padding:12px;
+border:none;
+border-radius:8px;
+background:#4e7fff;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+.preview{
+display:flex;
+flex-wrap:wrap;
+}
+
+.preview img{
+width:80px;
+height:80px;
+object-fit:cover;
+border-radius:8px;
+margin:5px;
+}
+
+.popup{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.6);
+display:none;
+justify-content:center;
+align-items:center;
+}
+
+.popupBox{
+background:#1c1c22;
+padding:20px;
+border-radius:12px;
+text-align:center;
+}
+/* loading overlay */
+
+#uploadLoading{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.7);
+display:none;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:9999;
+}
+
+.loadingBox{
+width:260px;
+background:#1c1c22;
+padding:20px;
+border-radius:12px;
+text-align:center;
+}
+
+.progressBar{
+width:100%;
+height:8px;
+background:#333;
+border-radius:6px;
+overflow:hidden;
+margin-top:10px;
+}
+
+.progress{
+height:100%;
+width:0%;
+background:#4e7fff;
+transition:0.2s;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>📷 写真投稿</h2>
+
+<input id="user" placeholder="投稿者名">
+
+<textarea id="comment" placeholder="コメント"></textarea>
+
+<input type="file" id="fileInput" accept="image/*" multiple>
+
+<div id="preview" class="preview"></div>
+
+<button onclick="upload()">投稿</button>
+
+</div>
+
+<div id="popup" class="popup">
+
+<div class="popupBox">
+
+<h3>投稿完了 🎉</h3>
+
+<button onclick="location.href='memory.html'">
+写真を見る
+</button>
+
+<button onclick="again()">
+続けて投稿
+</button>
+
+</div>
+
+</div>
+
+<form id="uploadForm"
+method="POST"
+target="hiddenFrame"
+action="https://script.google.com/macros/s/AKfycbxG67oS5YnSrSWRKw9BEUh6z6Av0KUsNU8OCTeI2S_LkquUDWkwC-1YFfx6aafkBAAP/exec">
+
+<input type="hidden" name="payload" id="payload">
+
+</form>
+
+<iframe name="hiddenFrame" style="display:none"></iframe>
+
+<script>
+
+const API="https://script.google.com/macros/s/AKfycbxG67oS5YnSrSWRKw9BEUh6z6Av0KUsNU8OCTeI2S_LkquUDWkwC-1YFfx6aafkBAAP/exec";
+const fileInput=document.getElementById("fileInput");
+const preview=document.getElementById("preview");
+
+let images=[];
+
+fileInput.addEventListener("change",()=>{
+
+images=[];
+preview.innerHTML="";
+
+const files=fileInput.files;
+
+for(let file of files){
+
+const reader=new FileReader();
+
+reader.onload=e=>{
+
+images.push(e.target.result);
+
+const img=document.createElement("img");
+img.src=e.target.result;
+
+preview.appendChild(img);
+
+};
+
+reader.readAsDataURL(file);
+
+}
+
+});
+
+async function upload(){
+
+if(images.length===0){
+alert("画像を選択してください");
+return;
+}
+
+const btn=document.querySelector("button");
+btn.disabled=true;
+
+document.getElementById("uploadLoading").style.display="flex";
+
+const progress=document.getElementById("progress");
+
+const user=document.getElementById("user").value||"匿名";
+const comment=document.getElementById("comment").value;
+
+let fake=0;
+
+const bar=setInterval(()=>{
+
+fake+=10;
+
+if(fake>90)fake=90;
+
+progress.style.width=fake+"%";
+
+},200);
+
+try{
+
+const res = await fetch(API,{
+method:"POST",
+headers:{
+"Content-Type":"text/plain"
+},
+body:JSON.stringify({
+type:"upload",
+images:images,
+user:user,
+comment:comment
+})
+});
+
+const result=await res.json();
+
+clearInterval(bar);
+
+progress.style.width="100%";
+
+setTimeout(()=>{
+
+document.getElementById("uploadLoading").style.display="none";
+
+btn.disabled=false;
+
+popup.style.display="flex";
+
+},400);
+
+}catch(err){
+
+clearInterval(bar);
+
+alert("アップロード失敗");
+
+btn.disabled=false;
+
+document.getElementById("uploadLoading").style.display="none";
+
+}
+
+}
+
+function again(){
+
+popup.style.display="none";
+preview.innerHTML="";
+fileInput.value="";
+images=[];
+
+}
+
+</script>
+<div id="uploadLoading">
+
+<div class="loadingBox">
+
+<div>アップロード中...</div>
+
+<div class="progressBar">
+<div id="progress" class="progress"></div>
+</div>
+
+</div>
+
+</div>
+</body>
+</html>

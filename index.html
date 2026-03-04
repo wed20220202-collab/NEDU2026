@@ -14,11 +14,70 @@
   button{width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#4e7fff,#335dff);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:.25s}
   button:hover{opacity:.85;transform:scale(1.02)}
   .secondary{margin-top:10px;background:#b0f}
+  .thirdary{margin-top:10px;background:rgb(0, 255, 94)}
   .error{color:#ff7474;margin-top:12px;font-size:14px;display:none}
-  input[type="password"]{width:100%;padding:12px;border:2px solid #4e7fff;border-radius:8px;background:#1d1d20;color:#fff;outline:none;margin-bottom:16px;font-size:15px;transition:.3s}
+  input[type="password"]{width:92%;padding:12px;border:2px solid #4e7fff;border-radius:8px;background:#1d1d20;color:#fff;outline:none;margin-bottom:16px;font-size:15px;transition:.3s}
   input[type="password"]:focus{border-color:#6aa0ff;box-shadow:0 0 12px #4e7fff}
   .small{opacity:.75;font-size:12px;margin-top:10px;line-height:1.5}
   .red{color: #f00;}
+  /* ===== ポップアップ ===== */
+  .popup-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.6);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    visibility:hidden;
+    opacity:0;
+    transition:.25s;
+  }
+
+  .popup-overlay.show{
+    visibility:visible;
+    opacity:1;
+  }
+
+  .popup{
+    background:#0c4fb5;
+    padding:25px;
+    border-radius:12px;
+    width:320px;
+    text-align:center;
+    box-shadow:0 0 20px rgba(0,0,0,.6);
+  }
+
+  .popup-buttons{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    margin-top:20px;
+  }
+
+  /* サイズを完全固定 */
+  .svg-btn{
+    width:120px;
+    height:120px;
+    object-fit:contain;
+    cursor:pointer;
+    transition:0.2s;
+  }
+
+  .svg-btn:hover{
+    transform:scale(1.08);
+  }
+
+  .svg-box{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .svg-label{
+    margin-top:6px;
+    font-size:13px;
+    font-weight:bold;
+  }
   </style>
 </head>
 
@@ -33,6 +92,7 @@
   <!-- ✅ data-to に遷移先を持たせる（これが一番確実） -->
   <button data-to="movie.html" onclick="loginToFromBtn(this)">動画を開く</button>
   <button class="secondary" data-to="viewer.html" onclick="loginToFromBtn(this)">画像を開く</button>
+  <button class="thirdary" id="openPopupBtn">謝恩会の思い出</button>
 
   <div id="err" class="error">パスワードが違います</div>
   <div class="small">
@@ -42,6 +102,38 @@
     ※ログイン状態はタブを閉じると消えます<br>
     ※一定時間で自動ログアウトします
   </div>
+</div>
+
+<div id="popupOverlay" class="popup-overlay">
+
+  <div class="popup">
+
+    <h3>メニュー</h3>
+
+    <div class="popup-buttons">
+
+      <div class="svg-box">
+        <img src="moon.svg"
+            class="svg-btn yellow"
+            onclick="location.href='photo.html'">
+        <div class="svg-label">写真投稿用</div>
+      </div>
+
+      <div class="svg-box">
+        <img src="rocket.svg"
+            class="svg-btn"
+            onclick="location.href='memory.html'">
+        <div class="svg-label">写真閲覧用</div>
+      </div>
+
+    </div>
+
+    <br><br>
+
+    <button onclick="closePopup()">閉じる</button>
+
+  </div>
+
 </div>
 
 <script>
@@ -85,7 +177,25 @@ async function loginTo(to){
   } else {
     document.getElementById("err").style.display = "block";
   }
+
+  
 }
+const popup = document.getElementById("popupOverlay");
+const popupBtn = document.getElementById("openPopupBtn");
+
+popupBtn.addEventListener("click", ()=>{
+  popup.classList.add("show");
+});
+
+function closePopup(){
+  popup.classList.remove("show");
+}
+
+popup.addEventListener("click", e=>{
+  if(e.target === popup){
+    popup.classList.remove("show");
+  }
+});
 </script>
 
 <!-- =========================

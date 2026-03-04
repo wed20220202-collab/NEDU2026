@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>写真ギャラリー</title>
+
+<style>
+
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI";
+background:#0e0e10;
+color:white;
+}
+
+/* header */
+
+header{
+position:sticky;
+top:0;
+background:#141418;
+padding:15px;
+text-align:center;
+font-weight:bold;
+font-size:18px;
+border-bottom:1px solid #222;
+}
+
+/* loader */
+
+#loader{
+position:fixed;
+inset:0;
+background:#0e0e10;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+z-index:999;
+}
+
+.spinner{
+width:50px;
+height:50px;
+border:6px solid #333;
+border-top:6px solid #4e7fff;
+border-radius:50%;
+animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+to{transform:rotate(360deg)}
+}
+
+#percent{
+margin-top:15px;
+font-size:15px;
+}
+
+/* feed */
+
+.feed{
+max-width:500px;
+margin:auto;
+}
+
+/* post */
+
+.post{
+background:#1a1a1f;
+margin-bottom:15px;
+border-radius:12px;
+overflow:hidden;
+}
+
+/* user */
+
+.userbar{
+padding:10px;
+font-size:14px;
+}
+
+/* carousel */
+
+.carousel{
+position:relative;
+}
+
+.carousel img{
+width:100%;
+display:block;
+}
+
+/* nav buttons */
+
+.nav{
+position:absolute;
+top:50%;
+transform:translateY(-50%);
+background:rgba(0,0,0,.4);
+padding:8px 12px;
+cursor:pointer;
+font-size:22px;
+}
+
+.left{left:0;}
+.right{right:0;}
+
+.actions{
+display:flex;
+gap:10px;
+padding:10px;
+font-size:18px;
+}
+
+.like.active{
+color:#ff4d6d;
+}
+
+.meta{
+padding:0 10px 10px;
+font-size:13px;
+}
+
+.comment{
+margin-top:4px;
+opacity:.8;
+}
+
+/* viewer */
+
+.viewer{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.9);
+display:none;
+justify-content:center;
+align-items:center;
+}
+
+.viewer img{
+max-width:95%;
+max-height:95%;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="loader">
+
+<div class="spinner"></div>
+<div id="percent">読込中です... 0%</div>
+
+</div>
+
+<header>
+📷 思い出アルバム
+</header>
+
+<div id="feed" class="feed"></div>
+
+<div id="viewer" class="viewer" onclick="closeViewer()">
+<img id="viewerImg">
+</div>
+
+<script>
+
+const API="https://script.google.com/macros/s/AKfycbxG67oS5YnSrSWRKw9BEUh6z6Av0KUsNU8OCTeI2S_LkquUDWkwC-1YFfx6aafkBAAP/exec";
+
+/* loader */
+
+let progress=0;
+
+const percent=document.getElementById("percent");
+
+const timer=setInterval(()=>{
+
+progress+=Math.random()*15;
+
+if(progress>90)progress=90;
+
+percent.textContent="読込中です... "+Math.floor(progress)+"%";
+
+},200);
+
+/* 初回ロード */
+
+async function load(){
+
+const res=await fetch(API+"?list=1");
+const list=await res.json();
+
+clearInterval(timer);
+
+percent.textContent="読込中です... 100%";
+
+setTimeout(()=>{
+document.getElementById("loader").style.display="none";
+},300);
+
+render(list);
+
+}
+
+/* 投稿描画 */
+
+function render(list){
+
+const feed=document.getElementById("feed");
+
+feed.innerHTML="";
+
+list.sort((a,b)=>b.time-a.time);
+
+list.forEach(p=>{
+
+const post=document.createElement("div");
+
+post.className="post";
+post.dataset.time=p.time;
+
+post.innerHTML=`
+
+<div class="userbar">
+👤 ${p.user}
+</div>
+
+<div class="carousel-container"></div>
+
+<div class="actions">
+
+<div class="like" onclick="like('${p.id}',this)">
+❤️
+</div>
+
+</div>
+
+<div class="meta">
+
+<div class="comment">
+💬 ${p.comment || ""}
+</div>
+
+<div>
+📅 ${new Date(p.time).toLocaleString()}
+</div>
+
+</div>
+
+`;
+
+const carouselBox=post.querySelector(".carousel-container");
+
+carouselBox.appendChild(createCarousel(p.file));
+
+feed.appendChild(post);
+
+});
+
+}
+
+/* carousel */
+
+function createCarousel(files){
+
+const box=document.createElement("div");
+box.className="carousel";
+
+const ids=files.split(",");
+
+let index=0;
+
+const img=document.createElement("img");
+
+img.src=getURL(ids[0]);
+img.onclick=()=>openViewer(getURL(ids[index]));
+
+box.appendChild(img);
+
+if(ids.length>1){
+
+const left=document.createElement("div");
+left.className="nav left";
+left.innerText="‹";
+
+const right=document.createElement("div");
+right.className="nav right";
+right.innerText="›";
+
+left.onclick=()=>{
+index--;
+if(index<0)index=ids.length-1;
+img.src=getURL(ids[index]);
+};
+
+right.onclick=()=>{
+index++;
+if(index>=ids.length)index=0;
+img.src=getURL(ids[index]);
+};
+
+box.append(left,right);
+
+}
+
+return box;
+
+}
+
+function getURL(id){
+return "https://drive.google.com/thumbnail?id="+id+"&sz=w1200";
+}
+
+/* like */
+
+async function like(id,btn){
+
+btn.classList.toggle("active");
+
+await fetch(API,{
+method:"POST",
+mode:"no-cors",
+body:JSON.stringify({
+type:"like",
+id:id
+})
+});
+
+}
+
+/* viewer */
+
+function openViewer(url){
+
+document.getElementById("viewerImg").src=url;
+document.getElementById("viewer").style.display="flex";
+
+}
+
+function closeViewer(){
+document.getElementById("viewer").style.display="none";
+}
+
+/* リアルタイム更新 */
+
+async function refreshFeed(){
+
+const res = await fetch(API+"?list=1");
+const list = await res.json();
+
+const feed=document.getElementById("feed");
+
+if(list.length===0) return;
+
+const latest=list.sort((a,b)=>b.time-a.time)[0];
+
+const firstPost=feed.firstChild;
+
+if(!firstPost) return;
+
+const firstTime=firstPost.dataset.time;
+
+if(latest.time!=firstTime){
+
+render(list);
+
+}
+
+}
+
+load();
+
+/* 5秒ごと更新 */
+
+setInterval(refreshFeed,5000);
+
+</script>
+
+</body>
+</html>
