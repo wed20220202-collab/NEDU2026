@@ -149,10 +149,10 @@ max-height:95%;
 /* 星空の背景のスタイル */
 .stars {
   position: relative;
-  width: 100%; /* 星空の横幅 */
-  height: 100vh; /* 星空の縦幅 */
-  background-image: linear-gradient(0deg, #00dedc, #115d89, #080f1c); /* 星空の背景色 */
-  overflow: hidden; /* 星が枠外にはみ出すのを防ぐ */
+  width: 100%;
+  min-height: 100vh; /* height → min-height に変更 */
+  background-image: linear-gradient(0deg, #00dedc, #115d89, #080f1c);
+  overflow: visible; /* hidden をやめる */
 }
 
 /* 星のスタイル */
